@@ -1,0 +1,175 @@
+/* frontend/src/styles/backgrounds.css */
+
+/* ============================================
+   FLEXIBLE BACKGROUND SYSTEM
+   Easily switch between themes by changing classes
+   ============================================ */
+
+/* Default: Pure Gradient (Current) */
+.auth-container,
+.emergency-viewer-container {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Option 1: Gradient with Subtle Pattern */
+.auth-container.with-pattern,
+.emergency-viewer-container.with-pattern {
+  background: 
+    linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%),
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 10px,
+      rgba(255, 255, 255, 0.03) 10px,
+      rgba(255, 255, 255, 0.03) 20px
+    );
+}
+
+/* Option 2: Medical Cross Pattern */
+.auth-container.medical-pattern,
+.emergency-viewer-container.medical-pattern {
+  background: 
+    linear-gradient(135deg, rgba(102, 126, 234, 0.92) 0%, rgba(118, 75, 162, 0.92) 100%),
+    repeating-linear-gradient(0deg, transparent, transparent 50px, rgba(255,255,255,0.05) 50px, rgba(255,255,255,0.05) 51px),
+    repeating-linear-gradient(90deg, transparent, transparent 50px, rgba(255,255,255,0.05) 50px, rgba(255,255,255,0.05) 51px);
+}
+
+/* Option 3: Animated Gradient */
+.auth-container.animated,
+.emergency-viewer-container.animated {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+  background-size: 200% 200%;
+  animation: gradientShift 15s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Option 4: Subtle Medical Icon Pattern (Using CSS) */
+.auth-container.icon-pattern {
+  background-color: #667eea;
+  background-image: 
+    radial-gradient(circle at 25% 25%, rgba(255,255,255,0.05) 2%, transparent 0),
+    radial-gradient(circle at 75% 75%, rgba(255,255,255,0.05) 2%, transparent 0);
+  background-size: 100px 100px;
+  background-position: 0 0, 50px 50px;
+}
+
+/* ============================================
+   USAGE INSTRUCTIONS
+   ============================================
+   
+   To change background style, simply add a class to the container:
+   
+   Default (Pure Gradient):
+   <div className="auth-container">
+   
+   With Pattern:
+   <div className="auth-container with-pattern">
+   
+   Medical Pattern:
+   <div className="auth-container medical-pattern">
+   
+   Animated:
+   <div className="auth-container animated">
+   
+   Icon Pattern:
+   <div className="auth-container icon-pattern">
+   
+   ============================================ */
+
+/* ============================================
+   CUSTOM THEME VARIABLES
+   Easy color customization
+   ============================================ */
+
+:root {
+  /* Primary Gradient Colors - Change these to update theme */
+  --bg-gradient-start: #667eea;
+  --bg-gradient-end: #764ba2;
+  
+  /* Alternative color schemes (uncomment to use) */
+  
+  /* Blue Medical Theme */
+  /* --bg-gradient-start: #4facfe;
+     --bg-gradient-end: #00f2fe; */
+  
+  /* Green Healthcare Theme */
+  /* --bg-gradient-start: #56ab2f;
+     --bg-gradient-end: #a8e063; */
+  
+  /* Professional Dark Blue */
+  /* --bg-gradient-start: #2c3e50;
+     --bg-gradient-end: #3498db; */
+  
+  /* Warm Medical Orange */
+  /* --bg-gradient-start: #f46b45;
+     --bg-gradient-end: #eea849; */
+}
+
+/* Apply custom theme colors */
+.auth-container.custom-theme {
+  background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+}
+
+/* ============================================
+   BACKGROUND IMAGES (Optional)
+   Uncomment and add image URLs to use
+   ============================================ */
+
+/* Example: Medical Background Image with Overlay */
+/*
+.auth-container.with-image {
+  background: 
+    linear-gradient(135deg, rgba(102, 126, 234, 0.85) 0%, rgba(118, 75, 162, 0.85) 100%),
+    url('/images/medical-background.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+*/
+
+/* Example: Dashboard with subtle texture */
+/*
+.dashboard {
+  background: 
+    linear-gradient(to bottom, rgba(255,255,255,0.97), rgba(255,255,255,0.97)),
+    url('/images/medical-texture.png');
+  background-size: cover;
+}
+*/
+
+/* ============================================
+   RESPONSIVE BACKGROUNDS
+   Different backgrounds for mobile
+   ============================================ */
+
+@media (max-width: 768px) {
+  /* Simpler backgrounds on mobile for performance */
+  .auth-container.animated {
+    animation: none;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .auth-container.with-pattern,
+  .auth-container.medical-pattern,
+  .auth-container.icon-pattern {
+    /* Use simple gradient on mobile */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+}
+
+/* ============================================
+   PRINT STYLES
+   Clean backgrounds for printing
+   ============================================ */
+
+@media print {
+  .auth-container,
+  .emergency-viewer-container {
+    background: white !important;
+  }
+}

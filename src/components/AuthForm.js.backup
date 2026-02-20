@@ -1,0 +1,268 @@
+// frontend/src/components/AuthForm.js 
+
+import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import umhwApi from '../api/umhwApi';
+import './AuthForm.css';
+import { useLocation } from 'react-router-dom';
+
+function AuthForm() {
+  const [formType, setFormType] = useState('login'); // login | register | forgot | reset
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('patient');
+  const [token, setToken] = useState('');
+  const [message, setMessage] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('resetSuccess')) {
+      setMessage('✅ Password reset successful. Please log in with your new password.');
+    }
+    // ✅ NEW: Show verification success message
+    if (location.state?.verificationSuccess) {
+      setMessage('✅ Email verified successfully! Please log in.');
+    }
+  }, [location]);
+
+  const toggle = () => {
+    if (formType === 'login') setFormType('register');
+    else if (formType === 'register') setFormType('login');
+    setMessage('');
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setMessage(''); // Clear previous messages
+
+    try {
+      if (formType === 'register') {
+        // Frontend validation for password
+        if (password.length < 8) {
+          setMessage('❌ Password must be at least 8 characters long');
+          return;
+        }
+        if (!/(?=.*[a-z])/.test(password)) {
+          setMessage('❌ Password must contain at least one lowercase letter');
+          return;
+        }
+        if (!/(?=.*[A-Z])/.test(password)) {
+          setMessage('❌ Password must contain at least one uppercase letter');
+          return;
+        }
+        if (!/(?=.*\d)/.test(password)) {
+          setMessage('❌ Password must contain at least one number');
+          return;
+        }
+
+        const res = await umhwApi.post('/auth/register', { email, password, role });
+        setMessage(res.data.message || '✅ Registration successful! Please log in.');
+        
+        // ✅ NEW: Redirect to email verification page
+        navigate('/verify-email', { 
+          state: { 
+            email: email,
+            message: res.data.message 
+          } 
+        });
+        // Auto-switch to login after successful registration
+        setTimeout(() => {
+          setFormType('login');
+          setPassword(''); // Clear password for security
+        }, 2000);
+      }
+      else if (formType === 'login') {
+  console.log("🔐 Submitting login with", { email, password });
+  const res = await umhwApi.post('/auth/login', { email, password });
+  console.log("✅ Login response:", res.data);
+  
+  // ✅ NEW: Check if 2FA is required
+  if (res.data.requires2FA) {
+    console.log("🔐 2FA required, redirecting...");
+    navigate('/2fa-login', { 
+      state: { 
+        userId: res.data.userId,
+        email: res.data.email 
+      } 
+    });
+    return;
+  }
+  
+  // No 2FA - normal login
+  sessionStorage.setItem('accessToken', res.data.accessToken);
+  console.log("💾 Saved token:", sessionStorage.getItem('accessToken'));
+
+  window.dispatchEvent(new Event("storage"));
+  console.log("🚀 Navigating to /dashboard...");
+  navigate('/dashboard');
+}
+      else if (formType === 'forgot') {
+        const res = await umhwApi.post('/auth/request-password-reset', { email });
+        setMessage(res.data.message || '✅ If this email exists, a password reset link has been sent.');
+      }
+      else if (formType === 'reset') {
+        // Frontend validation for reset password
+        if (password.length < 8) {
+          setMessage('❌ Password must be at least 8 characters long');
+          return;
+        }
+        if (!/(?=.*[a-z])/.test(password)) {
+          setMessage('❌ Password must contain at least one lowercase letter');
+          return;
+        }
+        if (!/(?=.*[A-Z])/.test(password)) {
+          setMessage('❌ Password must contain at least one uppercase letter');
+          return;
+        }
+        if (!/(?=.*\d)/.test(password)) {
+          setMessage('❌ Password must contain at least one number');
+          return;
+        }
+
+        const res = await umhwApi.post('/auth/reset-password', { token, password });
+        setMessage(res.data.message);
+        setFormType('login');
+      }
+
+    } catch (err) {
+      console.error("❌ Error:", err.response?.data || err.message);
+      
+      // Handle rate limiting (429)
+      if (err.response?.status === 429) {
+        setMessage(`❌ ${err.response?.data || 'Too many attempts. Please try again in 15 minutes.'}`);
+      } 
+      // Handle specific error messages
+      else if (err.response?.data?.errors) {
+        // Express-validator errors
+        const errorMessages = err.response.data.errors.map(e => e.message).join(', ');
+        setMessage(`❌ ${errorMessages}`);
+      } else if (err.response?.data?.message) {
+        setMessage(`❌ ${err.response.data.message}`);
+      } else {
+        setMessage('❌ An error occurred. Please try again.');
+      }
+    }
+  };
+
+  return (
+    <div className="auth-form">
+      <h2>
+        {formType === 'login' && 'Login'}
+        {formType === 'register' && 'Register'}
+        {formType === 'forgot' && 'Forgot Password'}
+        {formType === 'reset' && 'Reset Password'}
+      </h2>
+
+      <form onSubmit={submit}>
+        {(formType === 'login' || formType === 'register' || formType === 'forgot') && (
+          <div className="form-group">
+            <label>Email</label>
+            <input 
+              type="email"
+              value={email} 
+              onChange={e => setEmail(e.target.value)} 
+              required 
+              placeholder="your.email@example.com"
+            />
+          </div>
+        )}
+
+        {(formType === 'login' || formType === 'register' || formType === 'reset') && (
+          <div className="form-group">
+            <label>
+              Password
+              {formType === 'register' && (
+                <small style={{ display: 'block', color: '#666', fontWeight: 'normal', marginTop: '4px' }}>
+                  Must be 8+ characters with uppercase, lowercase, and number
+                </small>
+              )}
+            </label>
+            <input 
+              type="password" 
+              value={password} 
+              onChange={e => setPassword(e.target.value)}
+              required 
+              minLength={8}
+              placeholder={formType === 'register' ? 'e.g., MyPass123' : ''}
+            />
+          </div>
+        )}
+
+        {formType === 'register' && (
+          <div className="form-group">
+            <label>Role</label>
+            <select value={role} onChange={e => setRole(e.target.value)}>
+              <option value="patient">Patient</option>
+              <option value="doctor">Doctor</option>
+            </select>
+          </div>
+        )}
+
+        {formType === 'reset' && (
+          <div className="form-group">
+            <label>Reset Token</label>
+            <input value={token} onChange={e => setToken(e.target.value)} required />
+          </div>
+        )}
+
+        <button type="submit">
+          {formType === 'login' && 'Login'}
+          {formType === 'register' && 'Register'}
+          {formType === 'forgot' && 'Send Reset Link'}
+          {formType === 'reset' && 'Reset Password'}
+        </button>
+      </form>
+
+      <p className={`message ${message.startsWith('✅') ? 'success' : 'error'}`}>
+        {message}
+      </p>
+
+      {formType === 'login' && (
+        <>
+          <p>
+            <button 
+              onClick={() => { setFormType('forgot'); setMessage(''); }}
+              style={{ background: 'transparent', color: '#007bff', textDecoration: 'underline' }}
+            >
+              Forgot Password?
+            </button>
+          </p>
+          <p>
+            <button 
+              onClick={toggle}
+              style={{ background: 'transparent', color: '#007bff', textDecoration: 'underline' }}
+            >
+              Create an account
+            </button>
+          </p>
+        </>
+      )}
+
+      {formType === 'register' && (
+        <p>
+          <button 
+            onClick={toggle}
+            style={{ background: 'transparent', color: '#007bff', textDecoration: 'underline' }}
+          >
+            Already have an account? Login
+          </button>
+        </p>
+      )}
+
+      {formType === 'forgot' && (
+        <p>
+          <button 
+            onClick={() => { setFormType('login'); setMessage(''); }}
+            style={{ background: 'transparent', color: '#007bff', textDecoration: 'underline' }}
+          >
+            ← Back to Login
+          </button>
+        </p>
+      )}
+    </div>
+  );
+}
+
+export default AuthForm;

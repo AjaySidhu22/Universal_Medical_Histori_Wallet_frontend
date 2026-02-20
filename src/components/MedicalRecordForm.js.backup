@@ -1,0 +1,378 @@
+// frontend/src/components/MedicalRecordForm.js
+
+import React, { useState } from 'react';
+import umhwApi from '../api/umhwApi';
+
+function MedicalRecordForm({ onSuccess, patientId }) {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    diagnosis: '',
+    prescription: '',
+    notes: '',
+    recordDate: new Date().toISOString().split('T')[0]
+  });
+  const [file, setFile] = useState(null);
+  const [filePreview, setFilePreview] = useState(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+  const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError('');
+  };
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    
+    if (!selectedFile) {
+      setFile(null);
+      setFilePreview(null);
+      return;
+    }
+
+    // Validate file type
+    if (!ALLOWED_TYPES.includes(selectedFile.type)) {
+      setError('Invalid file type. Allowed: JPEG, PNG, WEBP, PDF');
+      setFile(null);
+      setFilePreview(null);
+      e.target.value = '';
+      return;
+    }
+
+    // Validate file size
+    if (selectedFile.size > MAX_SIZE) {
+      setError('File too large. Maximum size is 10MB');
+      setFile(null);
+      setFilePreview(null);
+      e.target.value = '';
+      return;
+    }
+
+    setFile(selectedFile);
+    setError('');
+
+    // Generate preview for images
+    if (selectedFile.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFilePreview(reader.result);
+      };
+      reader.readAsDataURL(selectedFile);
+    } else {
+      setFilePreview(null);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      // Create FormData for file upload
+      const submitData = new FormData();
+      
+      // Add all text fields
+      submitData.append('title', formData.title);
+      submitData.append('description', formData.description);
+      submitData.append('diagnosis', formData.diagnosis);
+      submitData.append('prescription', formData.prescription);
+      submitData.append('notes', formData.notes);
+      submitData.append('recordDate', formData.recordDate);
+      
+      if (patientId) {
+        submitData.append('patientId', patientId);
+      }
+
+      // Add file if selected
+      if (file) {
+        submitData.append('file', file);
+      }
+
+      const res = await umhwApi.post('/medical', submitData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      // Reset form
+      setFormData({
+        title: '',
+        description: '',
+        diagnosis: '',
+        prescription: '',
+        notes: '',
+        recordDate: new Date().toISOString().split('T')[0]
+      });
+      setFile(null);
+      setFilePreview(null);
+
+      if (onSuccess) onSuccess(res.data);
+
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create medical record');
+      console.error('Create record error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const removeFile = () => {
+    setFile(null);
+    setFilePreview(null);
+    document.getElementById('file-input').value = '';
+  };
+
+  return (
+    <div style={{ 
+      marginTop: '20px', 
+      padding: '20px', 
+      background: '#f8f9fa', 
+      borderRadius: '8px',
+      border: '1px solid #dee2e6'
+    }}>
+      <h4>Create New Medical Record</h4>
+
+      {error && (
+        <div style={{
+          padding: '12px',
+          marginBottom: '15px',
+          background: '#f8d7da',
+          color: '#721c24',
+          borderRadius: '4px',
+          border: '1px solid #f5c6cb'
+        }}>
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit}>
+        {patientId && (
+          <input type="hidden" name="patientId" value={patientId} />
+        )}
+
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>
+            Title: <span style={{ color: 'red' }}>*</span>
+          </label>
+          <input
+            type="text"
+            name="title"
+            value={formData.title}
+            onChange={handleChange}
+            required
+            placeholder="e.g., Annual Checkup, X-Ray Report"
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '4px',
+              border: '1px solid #ced4da'
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>
+            📎 Attach File (Optional)
+          </label>
+          <input
+            type="file"
+            id="file-input"
+            accept=".jpg,.jpeg,.png,.webp,.pdf"
+            onChange={handleFileChange}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '4px',
+              border: '1px solid #ced4da',
+              background: 'white'
+            }}
+          />
+          <small style={{ color: '#6c757d', display: 'block', marginTop: '5px' }}>
+            Allowed: JPEG, PNG, WEBP, PDF (Max 10MB)
+          </small>
+
+          {/* File Preview */}
+          {file && (
+            <div style={{
+              marginTop: '10px',
+              padding: '10px',
+              background: 'white',
+              borderRadius: '4px',
+              border: '1px solid #dee2e6'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <strong>{file.name}</strong>
+                  <div style={{ fontSize: '0.85em', color: '#666' }}>
+                    {(file.size / 1024 / 1024).toFixed(2)} MB
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={removeFile}
+                  style={{
+                    padding: '5px 10px',
+                    background: '#dc3545',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.9em'
+                  }}
+                >
+                  ✕ Remove
+                </button>
+              </div>
+
+              {/* Image Preview */}
+              {filePreview && (
+                <div style={{ marginTop: '10px' }}>
+                  <img 
+                    src={filePreview} 
+                    alt="Preview" 
+                    style={{ 
+                      maxWidth: '100%', 
+                      maxHeight: '200px',
+                      borderRadius: '4px',
+                      border: '1px solid #dee2e6'
+                    }} 
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>
+            Diagnosis:
+          </label>
+          <textarea
+            name="diagnosis"
+            value={formData.diagnosis}
+            onChange={handleChange}
+            rows={3}
+            placeholder="Medical diagnosis..."
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '4px',
+              border: '1px solid #ced4da',
+              fontFamily: 'inherit',
+              resize: 'vertical'
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>
+            Prescription:
+          </label>
+          <textarea
+            name="prescription"
+            value={formData.prescription}
+            onChange={handleChange}
+            rows={3}
+            placeholder="Prescribed medications..."
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '4px',
+              border: '1px solid #ced4da',
+              fontFamily: 'inherit',
+              resize: 'vertical'
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>
+            Notes:
+          </label>
+          <textarea
+            name="notes"
+            value={formData.notes}
+            onChange={handleChange}
+            rows={2}
+            placeholder="Additional notes..."
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '4px',
+              border: '1px solid #ced4da',
+              fontFamily: 'inherit',
+              resize: 'vertical'
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>
+            Description:
+          </label>
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            rows={2}
+            placeholder="Brief description..."
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '4px',
+              border: '1px solid #ced4da',
+              fontFamily: 'inherit',
+              resize: 'vertical'
+            }}
+          />
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>
+            Record Date: <span style={{ color: 'red' }}>*</span>
+          </label>
+          <input
+            type="date"
+            name="recordDate"
+            value={formData.recordDate}
+            onChange={handleChange}
+            required
+            max={new Date().toISOString().split('T')[0]}
+            style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '4px',
+              border: '1px solid #ced4da'
+            }}
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: '100%',
+            padding: '12px',
+            background: loading ? '#6c757d' : '#28a745',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            fontWeight: 'bold',
+            fontSize: '1em'
+          }}
+        >
+          {loading ? '⏳ Creating Record...' : '💾 Create Record'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+export default MedicalRecordForm;

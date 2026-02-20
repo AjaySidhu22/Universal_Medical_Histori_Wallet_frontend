@@ -1,0 +1,345 @@
+/* frontend/src/components/TwoFactorSettings.css */
+
+.two-factor-settings {
+  max-width: 800px;
+  margin: 40px auto;
+  padding: 30px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.two-factor-settings h2 {
+  color: #333;
+  margin-bottom: 30px;
+  font-size: 28px;
+  text-align: center;
+}
+
+.two-factor-loading {
+  text-align: center;
+  padding: 40px;
+  font-size: 18px;
+  color: #666;
+}
+
+/* Status Section */
+.two-factor-status {
+  text-align: center;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 12px 30px;
+  border-radius: 50px;
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+.status-badge.enabled {
+  background: #d4edda;
+  color: #155724;
+  border: 2px solid #c3e6cb;
+}
+
+.status-badge.disabled {
+  background: #f8d7da;
+  color: #721c24;
+  border: 2px solid #f5c6cb;
+}
+
+.status-description {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 30px;
+}
+
+/* Enable Section */
+.enable-section {
+  background: #f8f9fa;
+  padding: 30px;
+  border-radius: 10px;
+  margin-top: 20px;
+}
+
+.enable-section h3 {
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.enable-section p {
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 25px;
+}
+
+/* Manage Section */
+.manage-section {
+  margin-top: 30px;
+}
+
+.manage-section h3 {
+  color: #333;
+  margin-bottom: 25px;
+  text-align: left;
+}
+
+.action-card {
+  background: #f8f9fa;
+  padding: 25px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  border: 2px solid #e0e0e0;
+}
+
+.action-card.danger {
+  background: #fff3cd;
+  border-color: #ffc107;
+}
+
+.action-card h4 {
+  color: #333;
+  margin-bottom: 10px;
+  font-size: 18px;
+}
+
+.action-card p {
+  color: #666;
+  margin-bottom: 15px;
+}
+
+.action-card form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-card input {
+  flex: 1;
+  min-width: 200px;
+  padding: 12px 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.action-card input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.action-card button {
+  padding: 12px 25px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+/* Setup Section */
+.two-factor-setup {
+  margin-top: 30px;
+}
+
+.setup-step {
+  background: #f8f9fa;
+  padding: 40px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.setup-step h3 {
+  color: #333;
+  margin-bottom: 15px;
+  font-size: 24px;
+}
+
+.setup-step p {
+  color: #666;
+  margin-bottom: 25px;
+  font-size: 16px;
+}
+
+.warning-text {
+  background: #fff3cd;
+  padding: 15px;
+  border-radius: 8px;
+  border: 2px solid #ffc107;
+  color: #856404;
+  font-weight: 600;
+}
+
+/* QR Code */
+.qr-code-container {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  display: inline-block;
+  margin: 20px 0;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.qr-code-container img {
+  width: 250px;
+  height: 250px;
+  display: block;
+}
+
+/* Verification Input */
+.verification-input {
+  width: 200px !important;
+  padding: 15px !important;
+  font-size: 32px !important;
+  font-weight: bold;
+  text-align: center;
+  letter-spacing: 10px;
+  border: 3px solid #667eea !important;
+  border-radius: 10px;
+  margin: 20px auto;
+  display: block;
+}
+
+.verification-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.2);
+}
+
+/* Backup Codes */
+.backup-codes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  margin: 30px 0;
+}
+
+.backup-code {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 18px;
+  font-weight: bold;
+  color: #667eea;
+  border: 2px solid #667eea;
+  text-align: center;
+  letter-spacing: 2px;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 30px;
+  flex-wrap: wrap;
+}
+
+/* Buttons */
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 15px 35px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: white;
+  color: #667eea;
+  padding: 15px 35px;
+  border: 2px solid #667eea;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background: #667eea;
+  color: white;
+}
+
+.btn-danger {
+  background: #dc3545;
+  color: white;
+  padding: 12px 25px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #c82333;
+  transform: translateY(-2px);
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Message */
+.message {
+  margin-top: 20px;
+  padding: 15px;
+  border-radius: 8px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.message.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.message.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .two-factor-settings {
+    padding: 20px;
+    margin: 20px;
+  }
+
+  .backup-codes-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .qr-code-container img {
+    width: 200px;
+    height: 200px;
+  }
+
+  .action-card form {
+    flex-direction: column;
+  }
+
+  .action-card input {
+    width: 100%;
+  }
+}

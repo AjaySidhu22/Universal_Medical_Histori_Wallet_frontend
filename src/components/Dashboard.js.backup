@@ -1,0 +1,197 @@
+// frontend/src/components/Dashboard.js
+
+import React, { useEffect, useState } from 'react';
+import PatientAccessRequests from './PatientAccessRequests';
+import umhwApi from '../api/umhwApi';
+import ProfileForm from './ProfileForm';
+import { useNavigate, Navigate } from 'react-router-dom';
+import EmergencyQR from './EmergencyQR';
+import './Dashboard.css';
+function Dashboard() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [verificationWarning, setVerificationWarning] = useState(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        const res = await umhwApi.get('/profile/profile');
+        setUser(res.data.user);
+        
+        // If user is admin, redirect to admin panel
+        if (res.data.user.role === 'admin') {
+          navigate('/admin', { replace: true });
+          return;
+        }
+        
+        setProfile(res.data.profile);
+        
+        // Check for verification warning
+        if (res.data.profile?.verificationWarning) {
+          setVerificationWarning(res.data.profile.message);
+        }
+      } catch (err) {
+        console.error("❌ Profile fetch failed:", err);
+        sessionStorage.removeItem('accessToken');
+        navigate('/');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [navigate]);
+
+  if (loading) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading profile...</div>;
+  if (!user) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Unable to load user data. <a href="/">Please log in again</a>.</div>;
+
+  // Redirect admins to admin panel (shouldn't reach here, but defensive programming)
+  if (user.role === 'admin') {
+    return <Navigate to="/admin" replace />;
+  }
+
+  return (
+    <div className="dashboard" style={{ maxWidth: 800, margin: '20px auto', padding: '20px' }}>
+      <h2>Dashboard</h2>
+      <p>Welcome, <strong>{user.email}</strong></p>
+      <p>Your role: <span style={{ 
+        background: '#e7f3ff', 
+        padding: '4px 12px', 
+        borderRadius: '4px',
+        fontWeight: 'bold',
+        textTransform: 'capitalize'
+      }}>{user.role}</span></p>
+
+      {/* Verification Warning */}
+      {verificationWarning && (
+        <div style={{
+          background: '#fff3cd',
+          border: '1px solid #ffc107',
+          borderRadius: '8px',
+          padding: '15px',
+          marginBottom: '20px',
+          color: '#856404'
+        }}>
+          <strong>⚠️ Verification Status Changed</strong>
+          <p style={{ margin: '10px 0 0 0' }}>{verificationWarning}</p>
+        </div>
+      )}
+
+      <hr />
+
+      {isEditing ? (
+        <ProfileForm
+          user={user}
+          profile={profile}
+          setProfile={(newProfile) => {
+            setProfile(newProfile);
+            // Check for verification warning in the update response
+            if (newProfile?.verificationWarning) {
+              setVerificationWarning(newProfile.message);
+            }
+          }}
+          setIsEditing={setIsEditing}
+        />
+      ) : (
+        <>
+          <h3>Profile Information</h3>
+          {profile ? (
+            <div style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px' }}>
+              {user.role === 'patient' && (
+                <>
+                  <p><strong>Your Patient ID:</strong> <code style={{ background: '#e9ecef', padding: '2px 6px', borderRadius: '3px' }}>{profile.id}</code></p>
+                  <p><strong>Date of Birth:</strong> {profile.dob || <em style={{ color: '#999' }}>Not set</em>}</p>
+                  <p><strong>Blood Group:</strong> {profile.bloodGroup || <em style={{ color: '#999' }}>Not set</em>}</p>
+                  <p><strong>Allergies:</strong> {profile.allergies || <em style={{ color: '#999' }}>None listed</em>}</p>
+                  <p><strong>Emergency Contact:</strong> {profile.emergencyContactName || <em style={{ color: '#999' }}>Not set</em>}</p>
+                  {profile.emergencyContactNumber && (
+                    <p><strong>Emergency Number:</strong> {profile.emergencyContactNumber}</p>
+                  )}
+                </>
+              )}
+              {user.role === 'doctor' && (
+                <>
+                  <p><strong>Name:</strong> {profile.name || <em style={{ color: '#999' }}>Not set</em>}</p>
+                  <p><strong>Specialty:</strong> {profile.specialty || <em style={{ color: '#999' }}>Not set</em>}</p>
+                  <p><strong>License Number:</strong> {profile.licenseNumber || <em style={{ color: '#999' }}>Not set</em>}</p>
+                  <p><strong>Hospital:</strong> {profile.hospitalAffiliation || <em style={{ color: '#999' }}>Not set</em>}</p>
+                  <p>
+                    <strong>Verification Status:</strong> {' '}
+                    {profile.isVerified ? (
+                      <span style={{ color: 'green', fontWeight: 'bold' }}>✅ Verified</span>
+                    ) : (
+                      <span style={{ color: 'orange', fontWeight: 'bold' }}>⏳ Pending Admin Verification</span>
+                    )}
+                  </p>
+                  {!profile.isVerified && (
+                    <div style={{ 
+                      background: '#e7f3ff', 
+                      padding: '10px', 
+                      borderRadius: '4px', 
+                      marginTop: '10px',
+                      border: '1px solid #b3d9ff'
+                    }}>
+                      <small>
+                        💡 <strong>Note:</strong> You must be verified by an admin before you can create medical records.
+                      </small>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ) : (
+            <div style={{ background: '#fff3cd', padding: '15px', borderRadius: '4px', border: '1px solid #ffc107' }}>
+              <p>⚠️ No profile data available. Please create your profile to access full features.</p>
+            </div>
+          )}
+          <button 
+            onClick={() => setIsEditing(true)}
+            style={{
+              marginTop: '15px',
+              padding: '10px 20px',
+              background: '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            {profile ? 'Update Profile' : 'Create Profile'}
+          </button>
+
+          <button
+          onClick={() => navigate('/2fa-settings')}
+          style={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: 'white',
+            border: 'none',
+            padding: '12px 24px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: '500',
+            marginLeft: '10px'
+          }}
+        >
+          🔐 2FA Settings
+        </button>
+        </>
+      )}
+      {/* Show Access Requests for Patients */}
+      {user.role === 'patient' && (
+  <>
+    <hr style={{ margin: '30px 0', border: 'none', borderTop: '1px solid #dee2e6' }} />
+    <PatientAccessRequests />
+    
+    <hr style={{ margin: '30px 0', border: 'none', borderTop: '1px solid #dee2e6' }} />
+    <EmergencyQR />
+  </>
+)}
+    </div>
+  );
+}
+
+export default Dashboard;

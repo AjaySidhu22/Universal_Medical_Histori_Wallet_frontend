@@ -1,38 +1,102 @@
+/* frontend/src/App.css */
+
 .App {
+  min-height: 100vh;
+  background: var(--bg-secondary);
+}
+
+/* Main content wrapper */
+.app-content {
+  min-height: calc(100vh - 60px); /* Subtract header height */
+  padding: var(--spacing-lg);
+  animation: fadeIn 0.3s ease;
+}
+
+/* Page transitions */
+.page-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: all var(--transition-base);
+}
+
+.page-exit {
+  opacity: 1;
+}
+
+.page-exit-active {
+  opacity: 0;
+  transition: all var(--transition-fast);
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+}
+
+.loading-overlay .spinner {
+  width: 60px;
+  height: 60px;
+}
+
+/* Error boundary */
+.error-boundary {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+.error-boundary h1 {
+  color: var(--danger-color);
+  margin-bottom: var(--spacing-md);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.error-boundary p {
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-lg);
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
 }
 
-.App-link {
-  color: #61dafb;
+/* Selection color */
+::selection {
+  background: var(--primary-color);
+  color: var(--white);
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
+::-moz-selection {
+  background: var(--primary-color);
+  color: var(--white);
+}
+
+/* Focus visible (accessibility) */
+:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app-content {
+    padding: var(--spacing-md);
   }
 }

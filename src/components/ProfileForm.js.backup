@@ -1,0 +1,173 @@
+//frontend/src/components/ProfileForm.js
+
+import React, { useState } from 'react';
+import umhwApi from '../api/umhwApi';
+
+const formFields = {
+  patient: [
+    { name: 'dob', label: 'Date of Birth', type: 'date' },
+    { 
+      name: 'bloodGroup', 
+      label: 'Blood Group', 
+      type: 'select',
+      options: ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-']
+    },
+    { name: 'allergies', label: 'Allergies', type: 'textarea' },
+    { name: 'emergencyContactName', label: 'Emergency Contact Name', type: 'text' },
+    { name: 'emergencyContactNumber', label: 'Emergency Contact Number', type: 'tel' },
+  ],
+  doctor: [
+    { name: 'name', label: 'Full Name', type: 'text', required: true },
+    { name: 'specialty', label: 'Specialty', type: 'text', required: true },
+    { name: 'licenseNumber', label: 'License Number', type: 'text', required: true },
+    { name: 'hospitalAffiliation', label: 'Hospital Affiliation', type: 'text' },
+  ],
+};
+
+function ProfileForm({ user, profile, setProfile, setIsEditing }) {
+  const initial = profile || {};
+  const [form, setForm] = useState(initial);
+  const [msg, setMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setMsg('Saving...');
+
+    try {
+      const res = await umhwApi.put('/profile/profile', form);
+      setProfile(res.data.profile);
+      setMsg('✅ Profile updated successfully!');
+      
+      setTimeout(() => {
+        setIsEditing(false);
+      }, 1500);
+    } catch (err) {
+      console.error('Profile update error:', err);
+      setMsg('❌ ' + (err.response?.data?.message || 'Error updating profile'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fieldsToRender = formFields[user.role] || [];
+
+  return (
+    <form onSubmit={submit} style={{ marginTop: 20 }}>
+      {fieldsToRender.map((field) => (
+        <div key={field.name} style={{ marginBottom: 15 }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: 5 }}>
+            {field.label} {field.required && <span style={{ color: 'red' }}>*</span>}
+          </label>
+          
+          {field.type === 'select' ? (
+            <select
+              name={field.name}
+              value={form[field.name] || ''}
+              onChange={handleChange}
+              required={field.required}
+              style={{
+                width: '100%',
+                padding: '8px',
+                borderRadius: '4px',
+                border: '1px solid #ccc'
+              }}
+            >
+              <option value="">Select...</option>
+              {field.options.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          ) : field.type === 'textarea' ? (
+            <textarea
+              name={field.name}
+              value={form[field.name] || ''}
+              onChange={handleChange}
+              rows={3}
+              placeholder={`Enter ${field.label.toLowerCase()}...`}
+              style={{
+                width: '100%',
+                padding: '8px',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                fontFamily: 'inherit'
+              }}
+            />
+          ) : (
+            <input
+              type={field.type}
+              name={field.name}
+              value={form[field.name] || ''}
+              onChange={handleChange}
+              required={field.required}
+              placeholder={field.type === 'tel' ? 'e.g., +1234567890' : ''}
+              style={{
+                width: '100%',
+                padding: '8px',
+                borderRadius: '4px',
+                border: '1px solid #ccc'
+              }}
+            />
+          )}
+        </div>
+      ))}
+
+      <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>
+        <button
+          type="submit"
+          disabled={isLoading}
+          style={{
+            padding: '10px 20px',
+            background: isLoading ? '#ccc' : '#4caf50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: isLoading ? 'not-allowed' : 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          {isLoading ? 'Saving...' : 'Save Profile'}
+        </button>
+        
+        <button
+          type="button"
+          onClick={() => setIsEditing(false)}
+          disabled={isLoading}
+          style={{
+            padding: '10px 20px',
+            background: '#999',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: isLoading ? 'not-allowed' : 'pointer'
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+
+      {msg && (
+        <div
+          style={{
+            marginTop: 15,
+            padding: '10px',
+            borderRadius: '4px',
+            background: msg.includes('✅') ? '#d4edda' : '#f8d7da',
+            color: msg.includes('✅') ? '#155724' : '#721c24',
+            fontWeight: 'bold'
+          }}
+        >
+          {msg}
+        </div>
+      )}
+    </form>
+  );
+}
+
+export default ProfileForm;

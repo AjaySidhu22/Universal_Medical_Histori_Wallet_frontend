@@ -1,0 +1,293 @@
+// frontend/src/components/PatientAccessRequests.js
+
+import React, { useState, useEffect } from 'react';
+import umhwApi from '../api/umhwApi';
+
+function PatientAccessRequests() {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+  const [customDurations, setCustomDurations] = useState({});
+
+  const fetchRequests = async () => {
+    try {
+      setLoading(true);
+      const res = await umhwApi.get('/access-requests/my-requests');
+      setRequests(res.data);
+    } catch (err) {
+      console.error('Failed to fetch requests:', err);
+      setMessage('❌ Failed to load access requests');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+
+  const handleRespond = async (requestId, action, requestedDuration) => {
+    if (action === 'deny') {
+      if (!window.confirm('Deny access to this doctor?')) return;
+      
+      try {
+        await umhwApi.put(`/access-requests/${requestId}/respond`, { action });
+        setMessage(`✅ Request denied successfully`);
+        fetchRequests();
+        setTimeout(() => setMessage(''), 3000);
+      } catch (err) {
+        setMessage(`❌ Failed to deny request: ${err.response?.data?.message || err.message}`);
+      }
+      return;
+    }
+
+    const customDuration = customDurations[requestId] || requestedDuration;
+    const confirmMessage = `Allow this doctor to access your medical records for ${getDurationLabel(customDuration)}?`;
+    
+    if (!window.confirm(confirmMessage)) return;
+
+    try {
+      await umhwApi.put(`/access-requests/${requestId}/respond`, { 
+        action,
+        customDurationHours: customDuration
+      });
+      setMessage(`✅ Request approved for ${getDurationLabel(customDuration)}`);
+      fetchRequests();
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      setMessage(`❌ Failed to approve request: ${err.response?.data?.message || err.message}`);
+    }
+  };
+
+  const getStatusBadge = (status, expiresAt) => {
+    const isExpired = new Date() > new Date(expiresAt);
+    
+    if (isExpired && status === 'pending') {
+      return <span style={{ background: '#6c757d', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '0.85em' }}>⏱️ Expired</span>;
+    }
+    
+    const styles = {
+      pending: { background: '#ffc107', color: '#000' },
+      approved: { background: '#28a745', color: '#fff' },
+      denied: { background: '#dc3545', color: '#fff' },
+      expired: { background: '#6c757d', color: '#fff' }
+    };
+
+    const labels = {
+      pending: '⏳ Pending',
+      approved: '✅ Approved',
+      denied: '❌ Denied',
+      expired: '⏱️ Expired'
+    };
+
+    return (
+      <span style={{ 
+        ...styles[status], 
+        padding: '4px 8px', 
+        borderRadius: '4px', 
+        fontSize: '0.85em',
+        fontWeight: 'bold'
+      }}>
+        {labels[status]}
+      </span>
+    );
+  };
+
+  const getDurationLabel = (hours) => {
+    if (hours === 0.5) return '30 Minutes';  // ADDED
+    if (hours === 1) return '1 Hour';  // ADDED
+    if (hours === 24) return '24 Hours (1 Day)';
+    if (hours === 48) return '48 Hours (2 Days)';
+    if (hours === 72) return '72 Hours (3 Days)';
+    if (hours === 168) return '1 Week';
+    if (hours === 336) return '2 Weeks';
+    if (hours === 720) return '30 Days';
+    return `${hours} Hours`;
+  };
+
+  if (loading) return <div style={{ textAlign: 'center', padding: '20px' }}>Loading access requests...</div>;
+
+  return (
+    <div style={{ maxWidth: 900, margin: '20px auto', padding: '20px' }}>
+      <h3>📋 Access Requests from Doctors</h3>
+      
+      {message && (
+        <div style={{
+          padding: '12px',
+          marginBottom: '20px',
+          borderRadius: '4px',
+          background: message.includes('✅') ? '#d4edda' : '#f8d7da',
+          color: message.includes('✅') ? '#155724' : '#721c24',
+          border: `1px solid ${message.includes('✅') ? '#c3e6cb' : '#f5c6cb'}`
+        }}>
+          {message}
+        </div>
+      )}
+
+      {requests.length === 0 ? (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '40px', 
+          background: '#f8f9fa', 
+          borderRadius: '8px',
+          color: '#6c757d'
+        }}>
+          <p style={{ fontSize: '1.1em', margin: 0 }}>No access requests</p>
+          <small>Doctors will appear here when they request access to your records</small>
+        </div>
+      ) : (
+        <div>
+          {requests.map(request => {
+            const isExpired = new Date() > new Date(request.expiresAt);
+            const isPending = request.status === 'pending' && !isExpired;
+            const requestedDurationHours = request.requestedDuration || Math.round((new Date(request.expiresAt) - new Date(request.createdAt)) / (1000 * 60 * 60));
+
+            return (
+              <div 
+                key={request.id}
+                style={{
+                  border: '1px solid #dee2e6',
+                  borderRadius: '8px',
+                  padding: '20px',
+                  marginBottom: '15px',
+                  background: isPending ? '#fff3cd20' : 'white',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '15px' }}>
+                  <div>
+                    <h4 style={{ margin: '0 0 8px 0', color: '#333' }}>
+                      Dr. {request.DoctorProfile?.name || 'Unknown'}
+                    </h4>
+                    <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '0.95em' }}>
+                      <strong>Specialty:</strong> {request.DoctorProfile?.specialty}
+                    </p>
+                    <p style={{ margin: '0 0 5px 0', color: '#666', fontSize: '0.9em' }}>
+                      📧 {request.DoctorProfile?.User?.email}
+                    </p>
+                  </div>
+                  {getStatusBadge(request.status, request.expiresAt)}
+                </div>
+
+                <div style={{ background: '#f8f9fa', padding: '12px', borderRadius: '4px', marginBottom: '15px' }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '0.9em', color: '#495057' }}>
+                    <strong>Access Type:</strong> {request.requestType.charAt(0).toUpperCase() + request.requestType.slice(1)} records
+                  </p>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '0.9em', color: '#495057' }}>
+                    <strong>Requested Duration:</strong> {getDurationLabel(requestedDurationHours)}
+                  </p>
+                  {request.reason && (
+                    <p style={{ margin: '0 0 8px 0', fontSize: '0.9em', color: '#495057' }}>
+                      <strong>Reason:</strong> {request.reason}
+                    </p>
+                  )}
+                  <p style={{ margin: '0', fontSize: '0.85em', color: '#6c757d' }}>
+                    <strong>Requested:</strong> {new Date(request.createdAt).toLocaleString()}
+                  </p>
+                  <p style={{ margin: '5px 0 0 0', fontSize: '0.85em', color: '#6c757d' }}>
+                    <strong>Expires:</strong> {new Date(request.expiresAt).toLocaleString()}
+                  </p>
+                </div>
+
+                {isPending && (
+                  <div>
+                    <div style={{ marginBottom: '15px' }}>
+                      <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px', fontSize: '0.9em' }}>
+                        Approve for how long?
+                      </label>
+                      <select
+                        value={customDurations[request.id] || requestedDurationHours}
+                        onChange={(e) => setCustomDurations({
+                          ...customDurations,
+                          [request.id]: Number(e.target.value)
+                        })}
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          borderRadius: '4px',
+                          border: '1px solid #ced4da',
+                          fontSize: '0.9em'
+                        }}
+                      >
+                        <option value={0.5}>30 Minutes</option>
+                        <option value={1}>1 Hour</option>
+                        <option value={24}>24 Hours (1 Day)</option>
+                        <option value={48}>48 Hours (2 Days)</option>
+                        <option value={72}>72 Hours (3 Days)</option>
+                        <option value={168}>1 Week</option>
+                        <option value={336}>2 Weeks</option>
+                        <option value={720}>30 Days</option>
+                      </select>
+                      <small style={{ color: '#666', display: 'block', marginTop: '5px' }}>
+                        💡 Doctor requested: {getDurationLabel(requestedDurationHours)}
+                      </small>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button
+                        onClick={() => handleRespond(request.id, 'approve', requestedDurationHours)}
+                        style={{
+                          flex: 1,
+                          padding: '10px 20px',
+                          background: '#28a745',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        ✅ Approve Access
+                      </button>
+                      <button
+                        onClick={() => handleRespond(request.id, 'deny')}
+                        style={{
+                          flex: 1,
+                          padding: '10px 20px',
+                          background: '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        ❌ Deny Access
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {request.status === 'approved' && (
+                  <div style={{ 
+                    padding: '10px', 
+                    background: '#d4edda', 
+                    borderRadius: '4px',
+                    fontSize: '0.9em',
+                    color: '#155724'
+                  }}>
+                    ✅ You approved this request on {new Date(request.respondedAt).toLocaleString()}
+                  </div>
+                )}
+
+                {request.status === 'denied' && (
+                  <div style={{ 
+                    padding: '10px', 
+                    background: '#f8d7da', 
+                    borderRadius: '4px',
+                    fontSize: '0.9em',
+                    color: '#721c24'
+                  }}>
+                    ❌ You denied this request on {new Date(request.respondedAt).toLocaleString()}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default PatientAccessRequests;

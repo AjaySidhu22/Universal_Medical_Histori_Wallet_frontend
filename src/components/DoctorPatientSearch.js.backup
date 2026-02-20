@@ -1,0 +1,415 @@
+//frontend/src/components/DoctorPatientSearch.js 
+
+import React, { useState } from 'react';
+import umhwApi from '../api/umhwApi';
+import MedicalRecordForm from './MedicalRecordForm';
+
+function DoctorPatientSearch() {
+  const [patientId, setPatientId] = useState('');
+  const [requestType, setRequestType] = useState('both');
+  const [reason, setReason] = useState('');
+  const [requestDuration, setRequestDuration] = useState(48);
+  const [message, setMessage] = useState('');
+  const [myRequests, setMyRequests] = useState([]);
+  const [showMyRequests, setShowMyRequests] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedPatientId, setSelectedPatientId] = useState(null);
+
+  const handleRequestAccess = async (e) => {
+    e.preventDefault();
+    setMessage('');
+
+    if (!patientId.trim()) {
+      setMessage('❌ Please enter a valid Patient ID');
+      return;
+    }
+
+    try {
+      const res = await umhwApi.post('/access-requests', {
+        patientId: patientId.trim(),
+        requestType,
+        reason: reason.trim() || 'Medical consultation',
+        durationHours: requestDuration  // CHANGED from requestedDuration
+      });
+
+      setMessage(`✅ ${res.data.message}`);
+      setPatientId('');
+      setReason('');
+      setRequestDuration(48);
+      
+      if (showMyRequests) {
+        fetchMyRequests();
+      }
+    } catch (err) {
+      setMessage(`❌ ${err.response?.data?.message || 'Failed to send access request'}`);
+    }
+  };
+
+  const fetchMyRequests = async () => {
+    try {
+      const res = await umhwApi.get('/access-requests/my-requests');
+      setMyRequests(res.data);
+      setShowMyRequests(true);
+    } catch (err) {
+      setMessage('❌ Failed to load your requests');
+    }
+  };
+
+  const handleCancelRequest = async (requestId) => {
+    if (!window.confirm('Cancel this access request?')) return;
+
+    try {
+      await umhwApi.delete(`/access-requests/${requestId}`);
+      setMessage('✅ Request cancelled');
+      fetchMyRequests();
+    } catch (err) {
+      setMessage('❌ Failed to cancel request');
+    }
+  };
+
+  const getStatusBadge = (status, expiresAt) => {
+    const isExpired = new Date() > new Date(expiresAt);
+    
+    if (isExpired && status === 'pending') {
+      return <span style={{ background: '#6c757d', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '0.85em', fontWeight: 'bold' }}>⏱️ EXPIRED</span>;
+    }
+
+    const styles = {
+      pending: { background: '#ffc107', color: '#000' },
+      approved: { background: '#28a745', color: '#fff' },
+      denied: { background: '#dc3545', color: '#fff' },
+      expired: { background: '#6c757d', color: '#fff' }
+    };
+
+    return (
+      <span style={{ 
+        ...styles[status], 
+        padding: '4px 8px', 
+        borderRadius: '4px', 
+        fontSize: '0.85em',
+        fontWeight: 'bold'
+      }}>
+        {status.toUpperCase()}
+      </span>
+    );
+  };
+
+  const getDurationLabel = (hours) => {
+    if (hours === 24) return '24 Hours (1 Day)';
+    if (hours === 48) return '48 Hours (2 Days)';
+    if (hours === 72) return '72 Hours (3 Days)';
+    if (hours === 168) return '1 Week';
+    if (hours === 336) return '2 Weeks';
+    if (hours === 720) return '30 Days';
+    return `${hours} Hours`;
+  };
+
+  return (
+    <div>
+      <h3>🔍 Request Patient Access</h3>
+
+      {message && (
+        <div style={{
+          padding: '12px',
+          marginBottom: '20px',
+          borderRadius: '4px',
+          background: message.includes('✅') ? '#d4edda' : '#f8d7da',
+          color: message.includes('✅') ? '#155724' : '#721c24',
+          border: `1px solid ${message.includes('✅') ? '#c3e6cb' : '#f5c6cb'}`
+        }}>
+          {message}
+        </div>
+      )}
+
+      <form onSubmit={handleRequestAccess} style={{
+        background: '#f8f9fa',
+        padding: '20px',
+        borderRadius: '8px',
+        border: '1px solid #dee2e6',
+        marginBottom: '20px'
+      }}>
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>
+            Patient ID <span style={{ color: 'red' }}>*</span>
+          </label>
+          <input
+            type="text"
+            value={patientId}
+            onChange={(e) => setPatientId(e.target.value)}
+            placeholder="e.g., c6f5d931-1106-43b9-ad42-9c7c96e87f61"
+            required
+            style={{
+              width: '100%',
+              padding: '10px',
+              borderRadius: '4px',
+              border: '1px solid #ced4da',
+              fontSize: '0.95em',
+              fontFamily: 'monospace'
+            }}
+          />
+          <small style={{ color: '#6c757d', display: 'block', marginTop: '5px' }}>
+            💡 Patients can find their ID on their Dashboard
+          </small>
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>
+            Access Type
+          </label>
+          <select
+            value={requestType}
+            onChange={(e) => setRequestType(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px',
+              borderRadius: '4px',
+              border: '1px solid #ced4da'
+            }}
+          >
+            <option value="view">View Only</option>
+            <option value="create">Create Records Only</option>
+            <option value="both">View & Create (Recommended)</option>
+          </select>
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>
+            Access Duration
+          </label>
+          <select
+            value={requestDuration}
+            onChange={(e) => setRequestDuration(Number(e.target.value))}
+            style={{
+              width: '100%',
+              padding: '10px',
+              borderRadius: '4px',
+              border: '1px solid #ced4da'
+            }}
+          > 
+            <option value={0.5}>30 Minutes</option>
+            <option value={1}>1 Hour</option>
+            <option value={24}>24 Hours (1 Day)</option>
+            <option value={48}>48 Hours (2 Days) - Default</option>
+            <option value={72}>72 Hours (3 Days)</option>
+            <option value={168}>1 Week</option>
+            <option value={336}>2 Weeks</option>
+            <option value={720}>30 Days (Maximum)</option>
+          </select>
+          <small style={{ color: '#6c757d', display: 'block', marginTop: '5px' }}>
+            💡 How long you need access to patient records
+          </small>
+        </div>
+
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '5px' }}>
+            Reason for Access
+          </label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            placeholder="e.g., Routine consultation, Follow-up treatment..."
+            maxLength={500}
+            style={{
+              width: '100%',
+              padding: '10px',
+              borderRadius: '4px',
+              border: '1px solid #ced4da',
+              fontFamily: 'inherit',
+              resize: 'vertical'
+            }}
+          />
+          <small style={{ color: '#6c757d' }}>
+            {reason.length}/500 characters
+          </small>
+        </div>
+
+        <button
+          type="submit"
+          style={{
+            width: '100%',
+            padding: '12px',
+            background: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '1em'
+          }}
+        >
+          📤 Send Access Request
+        </button>
+      </form>
+
+      <div style={{ textAlign: 'center', margin: '20px 0' }}>
+        <button
+          onClick={fetchMyRequests}
+          style={{
+            padding: '10px 20px',
+            background: '#6c757d',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          {showMyRequests ? '🔄 Refresh My Requests' : '📋 View My Requests'}
+        </button>
+      </div>
+
+      {showMyRequests && (
+        <>
+          <div style={{ marginTop: '30px' }}>
+            <h4>My Access Requests ({myRequests.length})</h4>
+            {myRequests.length === 0 ? (
+              <p style={{ textAlign: 'center', color: '#6c757d', padding: '20px', background: '#f8f9fa', borderRadius: '4px' }}>
+                No requests sent yet
+              </p>
+            ) : (
+              myRequests.map(req => {
+                const isExpired = new Date() > new Date(req.expiresAt);
+                
+                return (
+                  <div
+                    key={req.id}
+                    style={{
+                      border: '1px solid #dee2e6',
+                      padding: '15px',
+                      marginBottom: '10px',
+                      borderRadius: '8px',
+                      background: 'white'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                      <div>
+                        <p style={{ margin: '0 0 5px 0', fontWeight: 'bold' }}>
+                          Patient: {req.PatientProfile?.User?.email}
+                        </p>
+                        <p style={{ margin: '0 0 5px 0', fontSize: '0.9em', color: '#666' }}>
+                          Type: {req.requestType} | Duration: {getDurationLabel(req.requestedDuration)}
+                        </p>
+                        <p style={{ margin: '0 0 5px 0', fontSize: '0.9em', color: '#666' }}>
+                          Sent: {new Date(req.createdAt).toLocaleString()}
+                        </p>
+                        <p style={{ margin: '0', fontSize: '0.85em', color: '#999' }}>
+                          Expires: {new Date(req.expiresAt).toLocaleString()}
+                        </p>
+                        {req.approvedDuration && req.status === 'approved' && (
+                          <p style={{ margin: '5px 0 0 0', fontSize: '0.85em', color: '#28a745', fontWeight: 'bold' }}>
+                            ✅ Approved for: {getDurationLabel(req.approvedDuration)}
+                          </p>
+                        )}
+                      </div>
+                      {getStatusBadge(req.status, req.expiresAt)}
+                    </div>
+
+                    {req.status === 'pending' && !isExpired && (
+                      <button
+                        onClick={() => handleCancelRequest(req.id)}
+                        style={{
+                          marginTop: '10px',
+                          padding: '6px 12px',
+                          background: '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '0.9em'
+                        }}
+                      >
+                        Cancel Request
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {myRequests.some(req => 
+            req.status === 'approved' && 
+            new Date(req.expiresAt) > new Date() &&
+            ['create', 'both'].includes(req.requestType)
+          ) && (
+            <div style={{ 
+              marginTop: '30px',
+              padding: '20px',
+              background: '#e7f3ff',
+              borderRadius: '8px',
+              border: '1px solid #b3d9ff'
+            }}>
+              <h4>✍️ Create Record for Approved Patient</h4>
+              <p style={{ fontSize: '0.9em', color: '#495057', marginBottom: '15px' }}>
+                Select an approved patient to create a medical record
+              </p>
+              
+              <select
+                value={selectedPatientId || ''}
+                onChange={(e) => {
+                  setSelectedPatientId(e.target.value);
+                  setShowCreateForm(false);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  marginBottom: '15px',
+                  borderRadius: '4px',
+                  border: '1px solid #ced4da',
+                  background: 'white'
+                }}
+              >
+                <option value="">-- Select Patient --</option>
+                {myRequests
+                  .filter(req => 
+                    req.status === 'approved' && 
+                    new Date(req.expiresAt) > new Date() &&
+                    ['create', 'both'].includes(req.requestType)
+                  )
+                  .map(req => (
+                    <option key={req.id} value={req.patientId}>
+                      {req.PatientProfile?.User?.email} - Expires: {new Date(req.expiresAt).toLocaleDateString()}
+                    </option>
+                  ))
+                }
+              </select>
+
+              {selectedPatientId && (
+                <button
+                  onClick={() => setShowCreateForm(!showCreateForm)}
+                  style={{
+                    padding: '10px 20px',
+                    background: showCreateForm ? '#dc3545' : '#28a745',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    marginBottom: '15px'
+                  }}
+                >
+                  {showCreateForm ? '❌ Cancel' : '✍️ Create New Record'}
+                </button>
+              )}
+
+              {showCreateForm && selectedPatientId && (
+                <MedicalRecordForm
+                  patientId={selectedPatientId}
+                  onSuccess={() => {
+                    setShowCreateForm(false);
+                    setSelectedPatientId(null);
+                    setMessage('✅ Medical record created successfully!');
+                    window.location.reload();
+                  }}
+                />
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+export default DoctorPatientSearch;

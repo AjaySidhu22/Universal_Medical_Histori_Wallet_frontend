@@ -1,0 +1,97 @@
+// \frontend\src\components\SharedRecordsViewer.js
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import umhwApi from '../api/umhwApi';
+
+function SharedRecordsViewer() {
+    const location = useLocation();
+    const [records, setRecords] = useState([]);
+    const [patient, setPatient] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        const query = new URLSearchParams(location.search);
+        const token = query.get('token');
+
+        if (!token) {
+            setError('Missing share token. The link may be incomplete.');
+            setLoading(false);
+            return;
+        }
+
+        const fetchSharedRecords = async () => {
+            try {
+                // Send the raw token to the unprotected backend route
+                const res = await umhwApi.get(`/share/${token}`); 
+
+                setRecords(res.data.records);
+                setPatient(res.data.patient);
+                setError('');
+
+            } catch (err) {
+                console.error("Shared record fetch failed:", err.response?.data || err.message);
+                setError(err.response?.data?.message || 'Invalid or expired share link.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchSharedRecords();
+    }, [location]);
+
+    if (loading) return <div style={{ textAlign: 'center', marginTop: '50px' }}>Loading shared medical records...</div>;
+
+    if (error) return (
+        <div style={{ maxWidth: 800, margin: '50px auto', padding: '20px', border: '1px solid red', borderRadius: '8px', color: 'red' }}>
+            <h2>Access Denied 🔒</h2>
+            <p>{error}</p>
+            <p>Please check the URL or contact the patient who provided the link.</p>
+        </div>
+    );
+
+    if (!patient) return <div style={{ textAlign: 'center', marginTop: '50px' }}>No data found for this link.</div>;
+
+    return (
+        <div style={{ maxWidth: 900, margin: '20px auto', padding: '20px', border: '1px solid #28a745', borderRadius: '8px', background: '#e8f5e9' }}>
+            <h2>Shared Medical History Access (Read-Only)</h2>
+
+            <div style={{ marginBottom: '20px', padding: '15px', border: '1px solid #ccc', background: 'white', borderRadius: '5px' }}>
+                <h3>Patient Details (Limited View)</h3>
+                <p><strong>Patient Email:</strong> {patient.User?.email}</p>
+                <p><strong>Blood Group:</strong> {patient.bloodGroup || 'Not provided'}</p>
+                <p><strong>Allergies:</strong> {patient.allergies || 'None listed'}</p>
+            </div>
+
+            <h3>{records.length} Records Shared:</h3>
+            {records.map(record => (
+                <div key={record.id} style={{ border: '1px solid #eee', padding: '15px', marginBottom: '15px', borderRadius: '5px', background: 'white' }}>
+                    <h4>{record.title} (on {new Date(record.recordDate).toLocaleDateString()})</h4>
+                    <p><strong>Description:</strong> {record.description}</p>
+
+                    {/* Display Doctor who created the record */}
+                    {record.DoctorProfile && (
+                        <p style={{ fontSize: '0.9em', color: '#555' }}>
+                            **Record Added By:** Dr. {record.DoctorProfile.User?.email} ({record.DoctorProfile.specialty})
+                        </p>
+                    )}
+
+                    {record.filePath && (
+                        <p>
+                            <strong>File:</strong> 
+                            <a 
+                                href={`http://localhost:5000${record.filePath}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                            >
+                                View Attached File
+                            </a>
+                        </p>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+}
+
+export default SharedRecordsViewer;

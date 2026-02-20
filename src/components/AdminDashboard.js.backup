@@ -1,0 +1,246 @@
+// frontend/src/components/AdminDashboard.js
+
+import React, { useEffect, useState } from 'react';
+import umhwApi from '../api/umhwApi';
+
+function AdminDashboard() {
+    const [users, setUsers] = useState([]);
+    const [doctors, setDoctors] = useState([]); // ✅ NEW: Store unverified doctors
+    const [loading, setLoading] = useState(true);
+    const [doctorsLoading, setDoctorsLoading] = useState(true); // ✅ NEW
+    const [error, setError] = useState('');
+    const [doctorError, setDoctorError] = useState(''); // ✅ NEW
+
+    // Fetch all users
+    const fetchUsers = async () => {
+        try {
+            setLoading(true);
+            const res = await umhwApi.get('/admin/users');
+            setUsers(res.data);
+        } catch (err) {
+            setError('Failed to fetch users');
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ✅ NEW: Fetch unverified doctors
+    const fetchUnverifiedDoctors = async () => {
+        try {
+            setDoctorsLoading(true);
+            setDoctorError('');
+            const res = await umhwApi.get('/admin/doctors/unverified');
+            setDoctors(res.data);
+        } catch (err) {
+            setDoctorError('Failed to fetch doctors');
+            console.error(err);
+        } finally {
+            setDoctorsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchUsers();
+        fetchUnverifiedDoctors(); // ✅ NEW: Fetch doctors on load
+    }, []);
+
+    // Delete user
+    const deleteUser = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this user?')) return;
+        try {
+            await umhwApi.delete(`/admin/users/${id}`);
+            setUsers(users.filter((u) => u.id !== id));
+        } catch (err) {
+            alert('Failed to delete user');
+        }
+    };
+
+    // Update role
+    const updateRole = async (id, role) => {
+        try {
+            // mark the row as updating (disable dropdown while saving)
+            setUsers(prev =>
+                prev.map(u => (u.id === id ? { ...u, updating: true } : u))
+            );
+
+            // call backend
+            await umhwApi.put(`/admin/users/${id}/role`, { role });
+
+            // update UI
+            setUsers(prev =>
+                prev.map(u => (u.id === id ? { ...u, role, updating: false } : u))
+            );
+
+            // check if current admin just removed their own admin role
+            const current = await umhwApi.get('/profile/profile');
+            if (current.data.user.id === id && role !== 'admin') {
+                alert('You changed your own role — you will be logged out.');
+                await umhwApi.post('/auth/logout');
+                sessionStorage.removeItem('accessToken');
+                window.location.href = '/';
+            }
+        } catch (err) {
+            alert('Failed to update role');
+            console.error(err);
+
+            // reset updating flag if error
+            setUsers(prev =>
+                prev.map(u => (u.id === id ? { ...u, updating: false } : u))
+            );
+        }
+    };
+
+    // ✅ NEW: Verify a doctor
+    const verifyDoctor = async (doctorId) => {
+        if (!window.confirm('Verify this doctor? They will be able to create medical records.')) return;
+        
+        try {
+            // Mark this doctor as updating
+            setDoctors(prev =>
+                prev.map(d => (d.id === doctorId ? { ...d, updating: true } : d))
+            );
+
+            // Call backend to verify
+            await umhwApi.put(`/admin/doctors/${doctorId}/verify`, { isVerified: true });
+
+            // Remove from unverified list
+            setDoctors(prev => prev.filter(d => d.id !== doctorId));
+
+            alert('✅ Doctor verified successfully!');
+        } catch (err) {
+            alert('❌ Failed to verify doctor: ' + (err.response?.data?.message || err.message));
+            console.error(err);
+
+            // Reset updating flag
+            setDoctors(prev =>
+                prev.map(d => (d.id === doctorId ? { ...d, updating: false } : d))
+            );
+        }
+    };
+
+    // ✅ NEW: Unverify a doctor (optional - for mistakes)
+    const unverifyDoctor = async (doctorId) => {
+        if (!window.confirm('Remove verification? This doctor will lose access to create records.')) return;
+        
+        try {
+            await umhwApi.put(`/admin/doctors/${doctorId}/verify`, { isVerified: false });
+            
+            // Refresh the list
+            fetchUnverifiedDoctors();
+            
+            alert('✅ Doctor unverified.');
+        } catch (err) {
+            alert('❌ Failed to unverify doctor');
+            console.error(err);
+        }
+    };
+
+    if (loading) return <p>Loading users...</p>;
+    if (error) return <p style={{ color: 'red' }}>{error}</p>;
+
+    return (
+        <div style={{ maxWidth: 1000, margin: '20px auto' }}>
+            <h2>Admin Dashboard</h2>
+
+            {/* ========== NEW SECTION: UNVERIFIED DOCTORS ========== */}
+            <div style={{ 
+                marginBottom: '40px', 
+                padding: '20px', 
+                border: '2px solid #ff9800', 
+                borderRadius: '8px',
+                background: '#fff3e0'
+            }}>
+                <h3 style={{ margin: '0 0 15px 0', color: '#e65100' }}>
+                    🔔 Pending Doctor Verifications ({doctors.length})
+                </h3>
+
+                {doctorsLoading ? (
+                    <p>Loading doctors...</p>
+                ) : doctorError ? (
+                    <p style={{ color: 'red' }}>{doctorError}</p>
+                ) : doctors.length === 0 ? (
+                    <p style={{ color: 'green', fontWeight: 'bold' }}>
+                        ✅ No pending verifications - all doctors are verified!
+                    </p>
+                ) : (
+                    <table border="1" cellPadding="10" style={{ width: '100%', borderCollapse: 'collapse', background: 'white' }}>
+                        <thead>
+                            <tr style={{ background: '#ffcc80' }}>
+                                <th>Doctor Email</th>
+                                <th>Specialty</th>
+                                <th>License Number</th>
+                                <th>Registered On</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {doctors.map((doc) => (
+                                <tr key={doc.id}>
+                                    <td>{doc.User?.email || 'N/A'}</td>
+                                    <td>{doc.specialty || 'Not specified'}</td>
+                                    <td>{doc.licenseNumber || 'Not specified'}</td>
+                                    <td>{new Date(doc.createdAt).toLocaleString()}</td>
+                                    <td>
+                                        <button 
+                                            onClick={() => verifyDoctor(doc.id)}
+                                            disabled={doc.updating}
+                                            style={{
+                                                padding: '8px 16px',
+                                                background: doc.updating ? '#ccc' : '#4caf50',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                cursor: doc.updating ? 'not-allowed' : 'pointer',
+                                                fontWeight: 'bold'
+                                            }}
+                                        >
+                                            {doc.updating ? 'Verifying...' : '✓ Verify Doctor'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+
+            {/* ========== EXISTING SECTION: USER MANAGEMENT ========== */}
+            <h3>All Users Management</h3>
+            <table border="1" cellPadding="8" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Created At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {users.map((u) => (
+                        <tr key={u.id}>
+                            <td>{u.email}</td>
+                            <td>
+                                <select
+                                    value={u.role}
+                                    disabled={u.updating}
+                                    onChange={(e) => updateRole(u.id, e.target.value)}
+                                >
+                                    <option value="patient">Patient</option>
+                                    <option value="doctor">Doctor</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </td>
+                            <td>{new Date(u.createdAt).toLocaleString()}</td>
+                            <td>
+                                <button onClick={() => deleteUser(u.id)}>Delete</button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+export default AdminDashboard;

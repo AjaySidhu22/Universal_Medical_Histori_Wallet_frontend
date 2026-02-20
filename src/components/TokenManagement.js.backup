@@ -1,0 +1,96 @@
+// \frontend\src\components\TokenManagement.js
+import React, { useState, useEffect } from 'react';
+import umhwApi from '../api/umhwApi';
+
+function TokenManagement() {
+    const [tokens, setTokens] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [statusMessage, setStatusMessage] = useState('');
+
+    const fetchTokens = async () => {
+        setLoading(true);
+        setStatusMessage('');
+        try {
+            // Calls the new protected backend route
+            const res = await umhwApi.get('/share/manage');
+            setTokens(res.data.tokens);
+            setError('');
+        } catch (err) {
+            console.error("Failed to fetch tokens:", err.response?.data || err.message);
+            setError('Failed to load active share tokens.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRevoke = async (tokenId) => {
+        if (!window.confirm('Are you sure you want to revoke this token immediately?')) return;
+
+        setStatusMessage(`Revoking token ${tokenId}...`);
+        try {
+            // Calls the new protected backend DELETE route
+            await umhwApi.delete(`/share/manage/${tokenId}`); 
+            setStatusMessage('✅ Token successfully revoked.');
+            // Refresh the list immediately
+            fetchTokens();
+        } catch (err) {
+            console.error("Revocation failed:", err.response?.data || err.message);
+            setStatusMessage(`❌ Error revoking token: ${err.response?.data?.message || 'Unauthorized or failed.'}`);
+        }
+    };
+
+    useEffect(() => {
+        fetchTokens();
+    }, []);
+
+    if (loading) return <div>Loading token management area...</div>;
+    if (error) return <p style={{ color: 'red' }}>{error}</p>;
+
+    return (
+        <div style={{ padding: '20px', border: '1px solid #ff9800', borderRadius: '8px', marginBottom: '30px', background: '#fff3e0' }}>
+            <h3>🔑 Active Share Tokens (Revoke Access)</h3>
+            <p style={{ fontWeight: 'bold' }}>{statusMessage}</p>
+
+            {tokens.length === 0 ? (
+                <p>You have no active share tokens.</p>
+            ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr style={{ background: '#ffcc80' }}>
+                            <th style={{ border: '1px solid #ddd', padding: '8px' }}>Shared With (Email)</th>
+                            <th style={{ border: '1px solid #ddd', padding: '8px' }}>Created</th>
+                            <th style={{ border: '1px solid #ddd', padding: '8px' }}>Expires</th>
+                            <th style={{ border: '1px solid #ddd', padding: '8px' }}>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {tokens.map(token => {
+                            const isExpired = new Date() > new Date(token.expiresAt);
+                            return (
+                                <tr key={token.id} style={{ background: isExpired ? '#ffebee' : 'white' }}>
+                                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>{token.sharedWithEmail || '—'}</td>
+                                    <td style={{ border: '1px solid #ddd', padding: '8px', fontSize: '0.9em' }}>{new Date(token.createdAt).toLocaleString()}</td>
+                                    <td style={{ border: '1px solid #ddd', padding: '8px', fontWeight: isExpired ? 'bold' : 'normal', color: isExpired ? 'red' : 'green' }}>
+                                        {new Date(token.expiresAt).toLocaleString()}
+                                        {isExpired && ' (Expired)'}
+                                    </td>
+                                    <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                                        <button 
+                                            onClick={() => handleRevoke(token.id)}
+                                            disabled={isExpired}
+                                        >
+                                            {isExpired ? 'Revoked' : 'Revoke Now'}
+                                        </button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            )}
+        </div>
+    );
+}
+
+export default TokenManagement;

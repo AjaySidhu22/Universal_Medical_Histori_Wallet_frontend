@@ -1,0 +1,363 @@
+// frontend/src/components/EmergencyViewer.js 
+
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import umhwApi from '../api/umhwApi';
+
+function EmergencyViewer() {
+  const { token } = useParams();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchEmergencyData();
+  }, [token]);
+
+  const fetchEmergencyData = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await umhwApi.get(`/qr/public/${token}`);
+      setData(res.data.data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Invalid or expired QR code');
+      console.error('Emergency access error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getFileIcon = (fileType) => {
+    if (!fileType) return '📄';
+    if (fileType.startsWith('image/')) return '🖼️';
+    if (fileType === 'application/pdf') return '📑';
+    return '📄';
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  };
+
+  if (loading) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{ 
+          background: 'white', 
+          padding: '40px', 
+          borderRadius: '12px',
+          textAlign: 'center',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+        }}>
+          <h2>🚨 Loading Emergency Records...</h2>
+          <p style={{ color: '#666' }}>Please wait...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{ 
+          background: 'white', 
+          padding: '40px', 
+          borderRadius: '12px',
+          textAlign: 'center',
+          maxWidth: '500px',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.3)'
+        }}>
+          <div style={{ fontSize: '64px', marginBottom: '20px' }}>⚠️</div>
+          <h2 style={{ color: '#dc3545', marginBottom: '15px' }}>Access Denied</h2>
+          <p style={{ color: '#666', marginBottom: '20px' }}>{error}</p>
+          <p style={{ fontSize: '0.9em', color: '#999' }}>
+            This QR code may have expired or been revoked. Please contact the patient for a new code.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ 
+      minHeight: '100vh', 
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '20px'
+    }}>
+      <div style={{ 
+        maxWidth: '900px', 
+        margin: '0 auto',
+        background: 'white',
+        borderRadius: '12px',
+        boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
+        overflow: 'hidden'
+      }}>
+        {/* Header */}
+        <div style={{ 
+          background: '#d32f2f', 
+          color: 'white', 
+          padding: '30px',
+          textAlign: 'center'
+        }}>
+          <h1 style={{ margin: '0 0 10px 0', fontSize: '2em' }}>🚨 Emergency Medical Records</h1>
+          <p style={{ margin: 0, fontSize: '1.1em', opacity: 0.9 }}>
+            Read-Only Access • No Login Required
+          </p>
+        </div>
+
+        {/* Access Info Banner */}
+        <div style={{ 
+          background: '#fff3cd', 
+          padding: '15px 30px',
+          borderBottom: '1px solid #ffc107'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+            <div>
+              <strong style={{ color: '#856404' }}>Access Level:</strong>{' '}
+              <span style={{ color: '#856404' }}>{data.accessInfo.scope}</span>
+            </div>
+            <div>
+              <strong style={{ color: '#856404' }}>Expires:</strong>{' '}
+              <span style={{ color: '#856404' }}>
+                {new Date(data.accessInfo.expiresAt).toLocaleString()}
+              </span>
+            </div>
+            <div>
+              <strong style={{ color: '#856404' }}>Views:</strong>{' '}
+              <span style={{ color: '#856404' }}>
+                {data.accessInfo.usageCount}
+                {data.accessInfo.maxUses ? ` / ${data.accessInfo.maxUses}` : ''}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: '30px' }}>
+          {/* Patient Info */}
+          <div style={{ 
+            marginBottom: '30px',
+            padding: '20px',
+            background: '#f8f9fa',
+            borderRadius: '8px',
+            border: '2px solid #007bff'
+          }}>
+            <h2 style={{ 
+              margin: '0 0 15px 0', 
+              color: '#007bff',
+              fontSize: '1.5em'
+            }}>
+              👤 Patient Information
+            </h2>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '15px'
+            }}>
+              <div>
+                <strong>Email:</strong> {data.patient.email || 'Not provided'}
+              </div>
+              <div>
+                <strong>Date of Birth:</strong> {data.patient.dob || 'Not provided'}
+              </div>
+              <div>
+                <strong style={{ color: '#dc3545' }}>🩸 Blood Group:</strong>{' '}
+                <span style={{ fontSize: '1.2em', fontWeight: 'bold', color: '#dc3545' }}>
+                  {data.patient.bloodGroup || 'Not provided'}
+                </span>
+              </div>
+              <div>
+                <strong style={{ color: '#ff9800' }}>⚠️ Allergies:</strong>{' '}
+                <span style={{ color: '#ff9800', fontWeight: 'bold' }}>
+                  {data.patient.allergies || 'None reported'}
+                </span>
+              </div>
+              <div>
+                <strong>Emergency Contact:</strong> {data.patient.emergencyContactName || 'Not provided'}
+              </div>
+              <div>
+                <strong>Emergency Phone:</strong> {data.patient.emergencyContactNumber || 'Not provided'}
+              </div>
+            </div>
+          </div>
+
+          {/* Medical Records */}
+          <div>
+            <h2 style={{ 
+              margin: '0 0 20px 0',
+              color: '#333',
+              fontSize: '1.5em'
+            }}>
+              📋 Medical Records ({data.records.length})
+            </h2>
+
+            {data.records.length === 0 ? (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '40px',
+                background: '#f8f9fa',
+                borderRadius: '8px',
+                color: '#666'
+              }}>
+                <p style={{ fontSize: '1.1em', margin: 0 }}>No medical records available</p>
+              </div>
+            ) : (
+              data.records.map(record => (
+                <div
+                  key={record.id}
+                  style={{
+                    marginBottom: '20px',
+                    padding: '20px',
+                    border: '2px solid #dee2e6',
+                    borderRadius: '8px',
+                    background: 'white',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}
+                >
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'start',
+                    marginBottom: '15px',
+                    flexWrap: 'wrap',
+                    gap: '10px'
+                  }}>
+                    <h3 style={{ margin: 0, color: '#333', fontSize: '1.3em' }}>
+                      {record.title}
+                    </h3>
+                    <span style={{
+                      padding: '4px 12px',
+                      background: '#007bff',
+                      color: 'white',
+                      borderRadius: '4px',
+                      fontSize: '0.9em',
+                      fontWeight: 'bold'
+                    }}>
+                      📅 {new Date(record.recordDate).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  {record.fileKey && (
+                    <div style={{
+                      background: '#e7f3ff',
+                      padding: '12px',
+                      borderRadius: '4px',
+                      marginBottom: '15px',
+                      border: '1px solid #b3d9ff'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                        <div>
+                          <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
+                            {getFileIcon(record.fileType)} Attached File
+                          </div>
+                          <div style={{ fontSize: '0.9em', color: '#495057' }}>
+                            {record.fileName} ({formatFileSize(record.fileSize)})
+                          </div>
+                        </div>
+                        {record.fileUrl && (
+                          
+                            <a href={record.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              padding: '8px 16px',
+                              background: '#007bff',
+                              color: 'white',
+                              textDecoration: 'none',
+                              borderRadius: '4px',
+                              fontSize: '0.9em',
+                              fontWeight: 'bold',
+                              display: 'inline-block'
+                            }}
+                          >
+                            📥 View/Download
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {record.DoctorProfile && (
+                    <p style={{ 
+                      margin: '0 0 15px 0',
+                      padding: '10px',
+                      background: '#f8f9fa',
+                      borderRadius: '4px',
+                      fontSize: '0.95em'
+                    }}>
+                      <strong>👨‍⚕️ Doctor:</strong> {record.DoctorProfile.name || 'Unknown'}
+                      {record.DoctorProfile.specialty && (
+                        <span style={{ marginLeft: '10px', color: '#666' }}>
+                          ({record.DoctorProfile.specialty})
+                        </span>
+                      )}
+                    </p>
+                  )}
+
+                  {record.diagnosis && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <strong style={{ color: '#495057' }}>🩺 Diagnosis:</strong>
+                      <p style={{ margin: '5px 0 0 0', paddingLeft: '20px', color: '#333' }}>
+                        {record.diagnosis}
+                      </p>
+                    </div>
+                  )}
+
+                  {record.prescription && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <strong style={{ color: '#495057' }}>💊 Prescription:</strong>
+                      <p style={{ margin: '5px 0 0 0', paddingLeft: '20px', color: '#333' }}>
+                        {record.prescription}
+                      </p>
+                    </div>
+                  )}
+
+                  {record.description && (
+                    <div>
+                      <strong style={{ color: '#495057' }}>📄 Description:</strong>
+                      <p style={{ margin: '5px 0 0 0', paddingLeft: '20px', color: '#333' }}>
+                        {record.description}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ 
+          background: '#f8f9fa', 
+          padding: '20px 30px',
+          borderTop: '1px solid #dee2e6',
+          textAlign: 'center',
+          fontSize: '0.9em',
+          color: '#666'
+        }}>
+          <p style={{ margin: 0 }}>
+            🔒 This is a secure, time-limited view of medical records. 
+            This page does not store any data.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default EmergencyViewer;
