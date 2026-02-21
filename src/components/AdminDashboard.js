@@ -12,21 +12,27 @@ function AdminDashboard() {
   const [error, setError] = useState('');
   const [doctorError, setDoctorError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [loggedInUserEmail, setLoggedInUserEmail] = useState(''); // NEW LINE
 
-  // Fetch all users
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const res = await umhwApi.get('/admin/users');
-      setUsers(res.data);
-      setError('');
-    } catch (err) {
-      setError('Failed to fetch users');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+   // Fetch all users
+const fetchUsers = async () => {
+  try {
+    setLoading(true);
+    
+    // Get current user's email
+    const profileRes = await umhwApi.get('/profile/profile');
+    setLoggedInUserEmail(profileRes.data.user.email);
+    
+    const res = await umhwApi.get('/admin/users');
+    setUsers(res.data);
+    setError('');
+  } catch (err) {
+    setError('Failed to fetch users');
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Fetch unverified doctors
   const fetchUnverifiedDoctors = async () => {
@@ -338,13 +344,19 @@ function AdminDashboard() {
                     {new Date(u.createdAt).toLocaleDateString()}
                   </td>
                   <td data-label="Actions">
-                    <button
-                      onClick={() => deleteUser(u.id)}
-                      className="btn-delete"
-                    >
-                      <span>🗑️</span>
-                      <span>Delete</span>
-                    </button>
+                     <button
+  onClick={() => deleteUser(u.id)}
+  className="btn-delete"
+  disabled={u.role === 'admin' && u.email === loggedInUserEmail}
+  title={u.role === 'admin' && u.email === loggedInUserEmail ? "Cannot delete your own admin account" : "Delete user"}
+  style={{
+    opacity: u.role === 'admin' && u.email === loggedInUserEmail ? 0.5 : 1,
+    cursor: u.role === 'admin' && u.email === loggedInUserEmail ? 'not-allowed' : 'pointer'
+  }}
+>
+  <span>🗑️</span>
+  <span>Delete</span>
+</button>
                   </td>
                 </tr>
               ))}
