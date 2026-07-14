@@ -222,6 +222,7 @@ function TwoFactorSettings() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    autoComplete="current-password"
                   />
                   <button type="submit" disabled={isLoading}>
                     {isLoading ? '⏳ Regenerating...' : 'Regenerate Codes'}
@@ -240,6 +241,7 @@ function TwoFactorSettings() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    autoComplete="current-password"
                   />
                   <button type="submit" className="btn-danger" disabled={isLoading}>
                     {isLoading ? '⏳ Disabling...' : 'Disable 2FA'}

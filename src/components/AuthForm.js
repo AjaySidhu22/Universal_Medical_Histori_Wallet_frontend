@@ -215,6 +215,7 @@ function AuthForm() {
                 required
                 placeholder="your.email@example.com"
                 disabled={isSubmitting}
+                autoComplete="email"
               />
             </div>
           )}
@@ -317,6 +318,7 @@ function AuthForm() {
                 minLength={8}
                 placeholder={formType === 'register' ? 'e.g., MyPass123' : '••••••••'}
                 disabled={isSubmitting}
+                autoComplete={formType === 'register' ? 'new-password' : 'current-password'}
               />
             </div>
           )}
