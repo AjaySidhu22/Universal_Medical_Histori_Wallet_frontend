@@ -139,6 +139,7 @@ function AuthForm() {
 
         // Normal login
         sessionStorage.setItem('accessToken', res.data.accessToken);
+        sessionStorage.setItem('userEmail', res.data.user.email);
         window.dispatchEvent(new Event("storage"));
         navigate('/dashboard');
       }

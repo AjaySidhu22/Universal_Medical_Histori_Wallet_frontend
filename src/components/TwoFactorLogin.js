@@ -48,6 +48,7 @@ function TwoFactorLogin() {
 
       // Save token and navigate
       sessionStorage.setItem('accessToken', res.data.accessToken);
+      sessionStorage.setItem('userEmail', res.data.user.email);
       window.dispatchEvent(new Event('storage'));
       
       setMessage('✅ Verification successful!');

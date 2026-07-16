@@ -47,12 +47,11 @@ function App() {
     return () => window.removeEventListener('storage', handler);
   }, []);
 
-  // Effect to fetch user email when token/login status changes
+  // Effect to get user email from sessionStorage (set at login time)
   useEffect(() => {
     if (isLogged) {
-      umhwApi.get('/profile/profile')
-        .then(res => setUserEmail(res.data.user.email))
-        .catch(() => setUserEmail(userPayload?.email || 'User'));
+      const storedEmail = sessionStorage.getItem('userEmail');
+      setUserEmail(storedEmail || userPayload?.email || 'User');
     } else {
       setUserEmail(null);
     }
