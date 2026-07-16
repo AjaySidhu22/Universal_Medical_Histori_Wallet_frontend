@@ -101,11 +101,7 @@ function EmergencyViewer() {
             </h2>
 
             <div className="emergency-grid">
-              <div className="emergency-field">
-                <strong>📧 Email</strong>
-                <p>{data.patient.email || 'Not provided'}</p>
-              </div>
-
+               
               <div className="emergency-field">
                 <strong>📅 Date of Birth</strong>
                 <p>{data.patient.dob || 'Not provided'}</p>
