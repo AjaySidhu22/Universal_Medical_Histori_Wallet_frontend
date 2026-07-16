@@ -81,8 +81,8 @@ function PatientAccessRequests() {
   const getStatusBadge = (status, expiresAt) => {
     const isExpired = new Date() > new Date(expiresAt);
 
-    if (isExpired && status === 'pending') {
-      return <span className="status-badge status-rejected">⏱️ Expired</span>;
+    if (isExpired && (status === 'pending' || status === 'approved')) {
+      return <span className="status-badge status-rejected">⏰ Expired</span>;
     }
 
     const statusMap = {
@@ -186,7 +186,9 @@ function PatientAccessRequests() {
                 <div className="request-header">
                   <div className="doctor-info">
                     <div className="doctor-name">
-                      👨‍⚕️ Dr. {request.DoctorProfile?.name || 'Unknown'}
+                      👨‍⚕️ {request.DoctorProfile?.name?.startsWith('Dr.')
+                        ? request.DoctorProfile.name
+                        : `Dr. ${request.DoctorProfile?.name || 'Unknown'}`}
                     </div>
                     <div className="doctor-specialty">
                       🏥 {request.DoctorProfile?.specialty}

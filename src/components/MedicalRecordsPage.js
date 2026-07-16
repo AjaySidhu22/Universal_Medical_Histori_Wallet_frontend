@@ -227,7 +227,9 @@ function MedicalRecordsPage() {
                 <div className="metadata-tag">
                   <span>👨‍⚕️</span>
                   <span>
-                    Dr. {record.DoctorProfile.name || record.DoctorProfile.User?.email || 'Unknown'}
+                    {record.DoctorProfile.name?.startsWith('Dr.') 
+                      ? record.DoctorProfile.name 
+                      : `Dr. ${record.DoctorProfile.name || record.DoctorProfile.User?.email || 'Unknown'}`}
                     {record.DoctorProfile.specialty && ` (${record.DoctorProfile.specialty})`}
                   </span>
                 </div>
