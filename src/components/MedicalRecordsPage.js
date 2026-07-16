@@ -135,7 +135,7 @@ function MedicalRecordsPage() {
           <div className="stat-card">
             <div className="stat-icon">📊</div>
             <div className="stat-content">
-              <h4>{records.length}</h4>
+              <h4>{pagination?.totalItems || records.length}</h4>
               <p>Total Records</p>
             </div>
           </div>
@@ -302,7 +302,7 @@ function MedicalRecordsPage() {
                   </a>
                 )}
 
-                {(isPatient || (isDoctor && record.doctorId)) && (
+                {user.role === 'admin' && (
                   <button
                     onClick={() => handleDeleteRecord(record.id)}
                     className="btn-delete"
