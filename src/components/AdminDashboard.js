@@ -91,7 +91,7 @@ const fetchUsers = async () => {
         window.location.href = '/';
       }
     } catch (err) {
-      setError('Failed to update role');
+      setError(err.response?.data?.message || 'Failed to update role');
       console.error(err);
       setUsers(prev =>
         prev.map(u => (u.id === id ? { ...u, updating: false } : u))
@@ -119,6 +119,19 @@ const fetchUsers = async () => {
       setDoctors(prev =>
         prev.map(d => (d.id === doctorId ? { ...d, updating: false } : d))
       );
+    }
+  };
+  
+  // Unverify doctor
+  const unverifyDoctor = async (userId, doctorProfileId) => {
+    if (!window.confirm('Revoke this doctor\'s verification? They will lose access to create medical records.')) return;
+    try {
+      await umhwApi.put(`/admin/doctors/${doctorProfileId}/verify`, { isVerified: false });
+      setSuccessMessage('✅ Doctor verification revoked');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      fetchUsers();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to revoke verification');
     }
   };
 
@@ -344,19 +357,31 @@ const fetchUsers = async () => {
                     {new Date(u.createdAt).toLocaleDateString()}
                   </td>
                   <td data-label="Actions">
-                     <button
-  onClick={() => deleteUser(u.id)}
-  className="btn-delete"
-  disabled={u.role === 'admin' && u.email === loggedInUserEmail}
-  title={u.role === 'admin' && u.email === loggedInUserEmail ? "Cannot delete your own admin account" : "Delete user"}
-  style={{
-    opacity: u.role === 'admin' && u.email === loggedInUserEmail ? 0.5 : 1,
-    cursor: u.role === 'admin' && u.email === loggedInUserEmail ? 'not-allowed' : 'pointer'
-  }}
->
-  <span>🗑️</span>
-  <span>Delete</span>
-</button>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {u.role === 'doctor' && u.DoctorProfile?.isVerified && (
+                        <button
+                          onClick={() => unverifyDoctor(u.id, u.DoctorProfile.id)}
+                          className="btn-delete"
+                          style={{ background: '#f59e0b' }}
+                        >
+                          <span>✕</span>
+                          <span>Revoke</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => deleteUser(u.id)}
+                        className="btn-delete"
+                        disabled={u.role === 'admin' && u.email === loggedInUserEmail}
+                        title={u.role === 'admin' && u.email === loggedInUserEmail ? "Cannot delete your own admin account" : "Delete user"}
+                        style={{
+                          opacity: u.role === 'admin' && u.email === loggedInUserEmail ? 0.5 : 1,
+                          cursor: u.role === 'admin' && u.email === loggedInUserEmail ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        <span>🗑️</span>
+                        <span>Delete</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
