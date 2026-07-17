@@ -53,7 +53,12 @@ function MedicalRecordsPage() {
 
     try {
       await umhwApi.delete(`/medical/${recordId}`);
-      setRecords(records.filter(r => r.id !== recordId));
+      const remainingOnPage = records.filter(r => r.id !== recordId).length;
+      if (remainingOnPage === 0 && currentPage > 1) {
+        fetchMyRecords(currentPage - 1);
+      } else {
+        fetchMyRecords(currentPage);
+      }
     } catch (err) {
       alert('Failed to delete record: ' + (err.response?.data?.message || err.message));
     }
