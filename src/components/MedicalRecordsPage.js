@@ -17,7 +17,7 @@ function MedicalRecordsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingRecord, setEditingRecord] = useState(null);
   const [editForm, setEditForm] = useState({});
-  
+
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
@@ -36,18 +36,18 @@ function MedicalRecordsPage() {
   }, []);
 
   const fetchMyRecords = async (page = 1) => {
-  try {
-    const res = await umhwApi.get(`/medical?page=${page}&limit=5`);
-    setRecords(res.data.data);
-    setPagination(res.data.pagination);
-    setCurrentPage(page);
-    setError('');
-  } catch (err) {
-    console.error("Record fetch failed:", err);
-    setError('Failed to fetch records');
-  }
-};
-  
+    try {
+      const res = await umhwApi.get(`/medical?page=${page}&limit=5`);
+      setRecords(res.data.data);
+      setPagination(res.data.pagination);
+      setCurrentPage(page);
+      setError('');
+    } catch (err) {
+      console.error("Record fetch failed:", err);
+      setError('Failed to fetch records');
+    }
+  };
+
   const handleEditRecord = (record) => {
     setEditingRecord(record.id);
     setEditForm({
@@ -69,12 +69,11 @@ function MedicalRecordsPage() {
       alert('Failed to update record: ' + (err.response?.data?.message || err.message));
     }
   };
-  
+
   const handleDeleteRecord = async (recordId) => {
     if (!window.confirm('Are you sure you want to delete this medical record? This action cannot be undone.')) {
       return;
     }
-
     try {
       await umhwApi.delete(`/medical/${recordId}`);
       const remainingOnPage = records.filter(r => r.id !== recordId).length;
@@ -102,7 +101,6 @@ function MedicalRecordsPage() {
     return (bytes / 1024 / 1024).toFixed(1) + ' MB';
   };
 
-  // Filter records based on search
   const filteredRecords = records.filter(record =>
     record.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     record.diagnosis?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -133,7 +131,6 @@ function MedicalRecordsPage() {
 
   return (
     <div className="medical-records-page">
-      {/* Header */}
       <div className="records-header">
         <h2>
           <span>📋</span>
@@ -144,21 +141,18 @@ function MedicalRecordsPage() {
         </p>
       </div>
 
-      {/* Doctor Search */}
       {isDoctor && (
         <div style={{ marginBottom: '40px' }}>
           <DoctorPatientSearch />
         </div>
       )}
 
-      {/* Error Message */}
       {error && (
         <div className="alert alert-danger">
           {error}
         </div>
       )}
 
-      {/* Stats Bar */}
       {records.length > 0 && (
         <div className="records-stats">
           <div className="stat-card">
@@ -180,7 +174,6 @@ function MedicalRecordsPage() {
         </div>
       )}
 
-      {/* Action Bar */}
       <div className="records-actions">
         <div className="search-bar">
           <span className="search-icon">🔍</span>
@@ -193,14 +186,12 @@ function MedicalRecordsPage() {
         </div>
       </div>
 
-      {/* Doctor Info Note */}
       {isDoctor && records.length > 0 && (
         <div className="alert alert-info">
           💡 <strong>Note:</strong> You can only see records for patients who have approved your access request.
         </div>
       )}
 
-      {/* Records Grid */}
       {filteredRecords.length === 0 ? (
         <div className="empty-state">
           {searchTerm ? (
@@ -227,6 +218,8 @@ function MedicalRecordsPage() {
         <div className="records-grid">
           {filteredRecords.map(record => (
             <div key={record.id} className="record-card">
+
+              {/* Record Header — always visible */}
               <div className="record-card-header">
                 <div>
                   <h3 className="record-title">
@@ -240,7 +233,7 @@ function MedicalRecordsPage() {
                 </div>
               </div>
 
-              {/* File Attachment */}
+              {/* File Attachment — always visible */}
               {record.fileKey && (
                 <div className="record-attachments">
                   <div className="attachment-badge">
@@ -251,13 +244,13 @@ function MedicalRecordsPage() {
                 </div>
               )}
 
-              {/* Doctor/Patient Info */}
+              {/* Doctor/Patient Info — always visible */}
               {isPatient && record.DoctorProfile && (
                 <div className="metadata-tag">
                   <span>👨‍⚕️</span>
                   <span>
-                    {record.DoctorProfile.name?.startsWith('Dr.') 
-                      ? record.DoctorProfile.name 
+                    {record.DoctorProfile.name?.startsWith('Dr.')
+                      ? record.DoctorProfile.name
                       : `Dr. ${record.DoctorProfile.name || record.DoctorProfile.User?.email || 'Unknown'}`}
                     {record.DoctorProfile.specialty && ` (${record.DoctorProfile.specialty})`}
                   </span>
@@ -271,55 +264,7 @@ function MedicalRecordsPage() {
                 </div>
               )}
 
-              {/* Diagnosis */}
-              {record.diagnosis && (
-                <div style={{ marginTop: 'var(--spacing-md)' }}>
-                  <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>
-                    🩺 Diagnosis:
-                  </strong>
-                  <p className="record-description">
-                    {record.diagnosis}
-                  </p>
-                </div>
-              )}
-
-              {/* Prescription */}
-              {record.prescription && (
-                <div style={{ marginTop: 'var(--spacing-sm)' }}>
-                  <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>
-                    💊 Prescription:
-                  </strong>
-                  <p className="record-description">
-                    {record.prescription}
-                  </p>
-                </div>
-              )}
-
-              {/* Notes */}
-              {record.notes && (
-                <div style={{ marginTop: 'var(--spacing-sm)' }}>
-                  <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>
-                    📝 Notes:
-                  </strong>
-                  <p className="record-description" style={{ fontStyle: 'italic' }}>
-                    {record.notes}
-                  </p>
-                </div>
-              )}
-
-              {/* Description */}
-              {record.description && (
-                <div style={{ marginTop: 'var(--spacing-sm)' }}>
-                  <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>
-                    📋 Description:
-                  </strong>
-                  <p className="record-description">
-                    {record.description}
-                  </p>
-                </div>
-              )}
-
-              {/* Actions */}
+              {/* EDIT MODE: show form instead of record content */}
               {editingRecord === record.id ? (
                 <div style={{ marginTop: '16px' }}>
                   <div style={{ marginBottom: '12px' }}>
@@ -377,45 +322,85 @@ function MedicalRecordsPage() {
                   </div>
                 </div>
               ) : (
-                <div className="record-actions">
-                  {record.fileUrl && (
-                    <a href={record.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn-view"
-                    >
-                      <span>👁️</span>
-                      <span>View File</span>
-                    </a>
+                <>
+                  {/* VIEW MODE: record content + action buttons */}
+                  {record.diagnosis && (
+                    <div style={{ marginTop: 'var(--spacing-md)' }}>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>
+                        🩺 Diagnosis:
+                      </strong>
+                      <p className="record-description">{record.diagnosis}</p>
+                    </div>
                   )}
 
-                  {isDoctor && record.DoctorProfile?.userId === user.id && (
-                    <button
-                      onClick={() => handleEditRecord(record)}
-                      className="btn-verify"
-                    >
-                      <span>✏️</span>
-                      <span>Edit</span>
-                    </button>
+                  {record.prescription && (
+                    <div style={{ marginTop: 'var(--spacing-sm)' }}>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>
+                        💊 Prescription:
+                      </strong>
+                      <p className="record-description">{record.prescription}</p>
+                    </div>
                   )}
 
-                  {user.role === 'admin' && (
-                    <button
-                      onClick={() => handleDeleteRecord(record.id)}
-                      className="btn-delete"
-                    >
-                      <span>🗑️</span>
-                      <span>Delete</span>
-                    </button>
+                  {record.notes && (
+                    <div style={{ marginTop: 'var(--spacing-sm)' }}>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>
+                        📝 Notes:
+                      </strong>
+                      <p className="record-description" style={{ fontStyle: 'italic' }}>{record.notes}</p>
+                    </div>
                   )}
-                </div>
+
+                  {record.description && (
+                    <div style={{ marginTop: 'var(--spacing-sm)' }}>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>
+                        📋 Description:
+                      </strong>
+                      <p className="record-description">{record.description}</p>
+                    </div>
+                  )}
+
+                  <div className="record-actions">
+                    {record.fileUrl && (
+                      
+                      <a  href={record.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-view"
+                      >
+                        <span>👁️</span>
+                        <span>View File</span>
+                      </a>
+                    )}
+
+                    {isDoctor && record.DoctorProfile?.userId === user.id && (
+                      <button
+                        onClick={() => handleEditRecord(record)}
+                        className="btn-verify"
+                      >
+                        <span>✏️</span>
+                        <span>Edit</span>
+                      </button>
+                    )}
+
+                    {user.role === 'admin' && (
+                      <button
+                        onClick={() => handleDeleteRecord(record.id)}
+                        className="btn-delete"
+                      >
+                        <span>🗑️</span>
+                        <span>Delete</span>
+                      </button>
+                    )}
+                  </div>
+                </>
               )}
+
             </div>
           ))}
         </div>
       )}
 
-     {/* ✅ ADD Pagination */}
       {pagination && pagination.totalPages > 1 && (
         <Pagination
           currentPage={currentPage}
@@ -426,7 +411,5 @@ function MedicalRecordsPage() {
     </div>
   );
 }
-
- 
 
 export default MedicalRecordsPage;
