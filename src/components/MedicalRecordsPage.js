@@ -322,37 +322,51 @@ function MedicalRecordsPage() {
               {/* Actions */}
               {editingRecord === record.id ? (
                 <div style={{ marginTop: '16px' }}>
-                  <input
-                    type="text"
-                    value={editForm.title}
-                    onChange={e => setEditForm({...editForm, title: e.target.value})}
-                    placeholder="Title"
-                    style={{ width: '100%', marginBottom: '8px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                  />
-                  <textarea
-                    value={editForm.diagnosis}
-                    onChange={e => setEditForm({...editForm, diagnosis: e.target.value})}
-                    placeholder="Diagnosis"
-                    style={{ width: '100%', marginBottom: '8px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                  />
-                  <textarea
-                    value={editForm.prescription}
-                    onChange={e => setEditForm({...editForm, prescription: e.target.value})}
-                    placeholder="Prescription"
-                    style={{ width: '100%', marginBottom: '8px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                  />
-                  <textarea
-                    value={editForm.notes}
-                    onChange={e => setEditForm({...editForm, notes: e.target.value})}
-                    placeholder="Notes"
-                    style={{ width: '100%', marginBottom: '8px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                  />
-                  <textarea
-                    value={editForm.description}
-                    onChange={e => setEditForm({...editForm, description: e.target.value})}
-                    placeholder="Description"
-                    style={{ width: '100%', marginBottom: '8px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                  />
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px', fontSize: '14px' }}>📄 Title</label>
+                    <input
+                      type="text"
+                      value={editForm.title}
+                      onChange={e => setEditForm({...editForm, title: e.target.value})}
+                      style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px', fontSize: '14px' }}>🩺 Diagnosis</label>
+                    <textarea
+                      value={editForm.diagnosis}
+                      onChange={e => setEditForm({...editForm, diagnosis: e.target.value})}
+                      rows={3}
+                      style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px', fontSize: '14px' }}>💊 Prescription</label>
+                    <textarea
+                      value={editForm.prescription}
+                      onChange={e => setEditForm({...editForm, prescription: e.target.value})}
+                      rows={3}
+                      style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px', fontSize: '14px' }}>📝 Notes</label>
+                    <textarea
+                      value={editForm.notes}
+                      onChange={e => setEditForm({...editForm, notes: e.target.value})}
+                      rows={3}
+                      style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '4px', fontSize: '14px' }}>📋 Description</label>
+                    <textarea
+                      value={editForm.description}
+                      onChange={e => setEditForm({...editForm, description: e.target.value})}
+                      rows={3}
+                      style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+                    />
+                  </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => handleSaveEdit(record.id)} className="btn-verify">
                       💾 Save
