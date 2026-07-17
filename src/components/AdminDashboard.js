@@ -114,6 +114,7 @@ const fetchUsers = async () => {
 
       setSuccessMessage('✅ Doctor verified successfully!');
       setTimeout(() => setSuccessMessage(''), 3000);
+      fetchUsers();
     } catch (err) {
       setError('Failed to verify doctor: ' + (err.response?.data?.message || err.message));
       setDoctors(prev =>
@@ -130,6 +131,7 @@ const fetchUsers = async () => {
       setSuccessMessage('✅ Doctor verification revoked');
       setTimeout(() => setSuccessMessage(''), 3000);
       fetchUsers();
+      fetchUnverifiedDoctors();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to revoke verification');
     }
