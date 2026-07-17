@@ -15,6 +15,8 @@ function MedicalRecordsPage() {
   const [pagination, setPagination] = useState(null);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [editForm, setEditForm] = useState({});
   
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -45,7 +47,29 @@ function MedicalRecordsPage() {
     setError('Failed to fetch records');
   }
 };
+  
+  const handleEditRecord = (record) => {
+    setEditingRecord(record.id);
+    setEditForm({
+      title: record.title || '',
+      description: record.description || '',
+      diagnosis: record.diagnosis || '',
+      prescription: record.prescription || '',
+      notes: record.notes || '',
+      recordDate: record.recordDate || ''
+    });
+  };
 
+  const handleSaveEdit = async (recordId) => {
+    try {
+      await umhwApi.put(`/medical/${recordId}`, editForm);
+      setEditingRecord(null);
+      fetchMyRecords(currentPage);
+    } catch (err) {
+      alert('Failed to update record: ' + (err.response?.data?.message || err.message));
+    }
+  };
+  
   const handleDeleteRecord = async (recordId) => {
     if (!window.confirm('Are you sure you want to delete this medical record? This action cannot be undone.')) {
       return;
@@ -296,29 +320,82 @@ function MedicalRecordsPage() {
               )}
 
               {/* Actions */}
-              <div className="record-actions">
-                {record.fileUrl && (
-                  
-                   <a href={record.fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-view"
-                  >
-                    <span>👁️</span>
-                    <span>View File</span>
-                  </a>
-                )}
+              {editingRecord === record.id ? (
+                <div style={{ marginTop: '16px' }}>
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={e => setEditForm({...editForm, title: e.target.value})}
+                    placeholder="Title"
+                    style={{ width: '100%', marginBottom: '8px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  />
+                  <textarea
+                    value={editForm.diagnosis}
+                    onChange={e => setEditForm({...editForm, diagnosis: e.target.value})}
+                    placeholder="Diagnosis"
+                    style={{ width: '100%', marginBottom: '8px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  />
+                  <textarea
+                    value={editForm.prescription}
+                    onChange={e => setEditForm({...editForm, prescription: e.target.value})}
+                    placeholder="Prescription"
+                    style={{ width: '100%', marginBottom: '8px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  />
+                  <textarea
+                    value={editForm.notes}
+                    onChange={e => setEditForm({...editForm, notes: e.target.value})}
+                    placeholder="Notes"
+                    style={{ width: '100%', marginBottom: '8px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  />
+                  <textarea
+                    value={editForm.description}
+                    onChange={e => setEditForm({...editForm, description: e.target.value})}
+                    placeholder="Description"
+                    style={{ width: '100%', marginBottom: '8px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => handleSaveEdit(record.id)} className="btn-verify">
+                      💾 Save
+                    </button>
+                    <button onClick={() => setEditingRecord(null)} className="btn-delete" style={{ background: '#6c757d' }}>
+                      ✕ Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="record-actions">
+                  {record.fileUrl && (
+                    <a href={record.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-view"
+                    >
+                      <span>👁️</span>
+                      <span>View File</span>
+                    </a>
+                  )}
 
-                {user.role === 'admin' && (
-                  <button
-                    onClick={() => handleDeleteRecord(record.id)}
-                    className="btn-delete"
-                  >
-                    <span>🗑️</span>
-                    <span>Delete</span>
-                  </button>
-                )}
-              </div>
+                  {isDoctor && record.DoctorProfile?.userId === user.id && (
+                    <button
+                      onClick={() => handleEditRecord(record)}
+                      className="btn-verify"
+                    >
+                      <span>✏️</span>
+                      <span>Edit</span>
+                    </button>
+                  )}
+
+                  {user.role === 'admin' && (
+                    <button
+                      onClick={() => handleDeleteRecord(record.id)}
+                      className="btn-delete"
+                    >
+                      <span>🗑️</span>
+                      <span>Delete</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
