@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import umhwApi from '../api/umhwApi';
-import MedicalRecordForm from './MedicalRecordForm';
 import './DoctorPatientSearch.css';
 
 function DoctorPatientSearch() {

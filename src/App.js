@@ -7,7 +7,6 @@ import Dashboard from './components/Dashboard';
 import ResetPassword from './components/ResetPassword';
 import AdminDashboard from './components/AdminDashboard';
 import MedicalRecordsPage from './components/MedicalRecordsPage';
-import EmailVerification from './components/auth/EmailVerification';
 import SharedRecordsViewer from './components/SharedRecordsViewer';
 import Header from './components/Header';
 import umhwApi from './api/umhwApi'; 
@@ -124,7 +123,6 @@ function App() {
 
         {/* Public Routes */}
          <Route path="/reset-password/:token" element={<ResetPassword />} />
-        <Route path="/share/view" element={<SharedRecordsViewer />} />
 
         {/* Fallback - redirect based on role */}
         <Route 
