@@ -1,5 +1,5 @@
 // frontend/src/components/DoctorPatientSearch.js
-
+import MedicalRecordForm from './MedicalRecordForm';
 import React, { useState } from 'react';
 import umhwApi from '../api/umhwApi';
 import './DoctorPatientSearch.css';

@@ -1,4 +1,4 @@
-// \frontend\src\App.js
+// frontend/src/App.js
 
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
@@ -7,15 +7,14 @@ import Dashboard from './components/Dashboard';
 import ResetPassword from './components/ResetPassword';
 import AdminDashboard from './components/AdminDashboard';
 import MedicalRecordsPage from './components/MedicalRecordsPage';
-import SharedRecordsViewer from './components/SharedRecordsViewer';
 import Header from './components/Header';
-import umhwApi from './api/umhwApi'; 
 import EmergencyViewer from './components/EmergencyViewer';
-import './App.css';
-import './styles/theme.css';
-import './styles/backgrounds.css'; 
+import EmailVerification from './components/auth/EmailVerification';
 import TwoFactorLogin from './components/TwoFactorLogin';
 import TwoFactorSettings from './components/TwoFactorSettings';
+import './App.css';
+import './styles/theme.css';
+import './styles/backgrounds.css';
 
 function App() {
   const [token, setToken] = useState(sessionStorage.getItem('accessToken'));
@@ -23,7 +22,6 @@ function App() {
 
   const isLogged = !!token;
 
-  // Function to decode token payload
   const decodeToken = (t) => {
     if (!t) return null;
     try {
@@ -35,9 +33,8 @@ function App() {
   };
 
   const userPayload = decodeToken(token);
-  let role = userPayload ? userPayload.role : null;
+  const role = userPayload ? userPayload.role : null;
 
-  // Effect to check storage changes (login/logout)
   useEffect(() => {
     const handler = () => {
       setToken(sessionStorage.getItem('accessToken'));
@@ -46,7 +43,6 @@ function App() {
     return () => window.removeEventListener('storage', handler);
   }, []);
 
-  // Effect to get user email from sessionStorage (set at login time)
   useEffect(() => {
     if (isLogged) {
       const storedEmail = sessionStorage.getItem('userEmail');
@@ -60,26 +56,17 @@ function App() {
     <Router>
       <Header userEmail={userEmail} />
       <Routes>
-         {/* Public emergency access - NO AUTH REQUIRED */}
-  <Route path="/emergency/:token" element={<EmergencyViewer />} />
-
-          {/* Email Verification - Public route */}
-  <Route path="/verify-email" element={<EmailVerification />} />
-
-  {/* 2FA Login - Public route */}
-<Route path="/2fa-login" element={<TwoFactorLogin />} />
-
-{/* 2FA Settings - Protected route */}
-<Route
-  path="/2fa-settings"
-  element={
-    isLogged && role !== 'admin'
-      ? <TwoFactorSettings />
-      : <Navigate to={role === 'admin' ? '/admin' : '/'} replace />
-  }
-/>
-
-        {/* Root route */}
+        <Route path="/emergency/:token" element={<EmergencyViewer />} />
+        <Route path="/verify-email" element={<EmailVerification />} />
+        <Route path="/2fa-login" element={<TwoFactorLogin />} />
+        <Route
+          path="/2fa-settings"
+          element={
+            isLogged && role !== 'admin'
+              ? <TwoFactorSettings />
+              : <Navigate to={role === 'admin' ? '/admin' : '/'} replace />
+          }
+        />
         <Route
           path="/"
           element={
@@ -90,49 +77,39 @@ function App() {
               : <AuthForm />
           }
         />
-
-        {/* Dashboard - Only for patients and doctors */}
-        <Route 
-          path="/dashboard" 
+        <Route
+          path="/dashboard"
           element={
-            isLogged 
+            isLogged
               ? (role === 'admin' ? <Navigate to="/admin" replace /> : <Dashboard />)
               : <Navigate to="/" replace />
-          } 
+          }
         />
-
-        {/* Admin Panel - Only for admins */}
-        <Route 
-          path="/admin" 
+        <Route
+          path="/admin"
           element={
-            isLogged && role === 'admin' 
-              ? <AdminDashboard /> 
+            isLogged && role === 'admin'
+              ? <AdminDashboard />
               : <Navigate to="/" replace />
-          } 
+          }
         />
-
-        {/* Medical Records - Only for patients and doctors (NOT admin) */}
-        <Route 
-          path="/records" 
+        <Route
+          path="/records"
           element={
             isLogged && role !== 'admin'
-              ? <MedicalRecordsPage /> 
+              ? <MedicalRecordsPage />
               : <Navigate to={role === 'admin' ? '/admin' : '/'} replace />
-          } 
+          }
         />
-
-        {/* Public Routes */}
-         <Route path="/reset-password/:token" element={<ResetPassword />} />
-
-        {/* Fallback - redirect based on role */}
-        <Route 
-          path="*" 
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
+        <Route
+          path="*"
           element={
-            <Navigate 
-              to={isLogged ? (role === 'admin' ? "/admin" : "/dashboard") : "/"} 
-              replace 
+            <Navigate
+              to={isLogged ? (role === 'admin' ? "/admin" : "/dashboard") : "/"}
+              replace
             />
-          } 
+          }
         />
       </Routes>
     </Router>
