@@ -1,7 +1,24 @@
 // frontend/src/components/AuthForm.js
 
-import { useNavigate, useLocation } from 'react-router-dom';
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  Heart,
+  Mail,
+  Lock,
+  User,
+  CheckCircle,
+  XCircle,
+  Loader,
+  LogIn,
+  UserPlus,
+  Send,
+  KeyRound,
+  ArrowLeft,
+  AlertCircle,
+  Check,
+  X
+} from 'lucide-react';
 import umhwApi from '../api/umhwApi';
 import './AuthForm.css';
 
@@ -9,12 +26,13 @@ function AuthForm() {
   const [formType, setFormType] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');  // ✅ NEW
-  const [usernameStatus, setUsernameStatus] = useState(null);  // ✅ NEW: null | 'checking' | 'available' | 'taken'
-  const [usernameSuggestions, setUsernameSuggestions] = useState([]);  // ✅ NEW
+  const [username, setUsername] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState(null);
+  const [usernameSuggestions, setUsernameSuggestions] = useState([]);
   const [role, setRole] = useState('patient');
   const [token, setToken] = useState('');
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('error');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -22,21 +40,21 @@ function AuthForm() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('resetSuccess')) {
-      setMessage('✅ Password reset successful. Please log in with your new password.');
+      setMessage('Password reset successful. Please log in with your new password.');
+      setMessageType('success');
     }
     if (location.state?.verificationSuccess) {
-      setMessage('✅ Email verified successfully! Please log in.');
+      setMessage('Email verified successfully. Please log in.');
+      setMessageType('success');
     }
   }, [location]);
 
-  // ✅ NEW: Real-time username availability check
   useEffect(() => {
     if (formType !== 'register' || !username || username.length < 3) {
       setUsernameStatus(null);
       setUsernameSuggestions([]);
       return;
     }
-
     const timer = setTimeout(async () => {
       setUsernameStatus('checking');
       try {
@@ -48,22 +66,30 @@ function AuthForm() {
           setUsernameStatus('taken');
           setUsernameSuggestions(res.data.suggestions || []);
         }
-      } catch (err) {
+      } catch {
         setUsernameStatus('error');
-        setUsernameSuggestions([]);
       }
-    }, 500); // Debounce: wait 500ms after user stops typing
-
+    }, 500);
     return () => clearTimeout(timer);
   }, [username, formType]);
 
+  const setError = (msg) => { setMessage(msg); setMessageType('error'); };
+  const setSuccess = (msg) => { setMessage(msg); setMessageType('success'); };
+
   const toggle = () => {
-    if (formType === 'login') setFormType('register');
-    else if (formType === 'register') setFormType('login');
+    setFormType(f => f === 'login' ? 'register' : 'login');
     setMessage('');
     setUsername('');
     setUsernameStatus(null);
     setUsernameSuggestions([]);
+  };
+
+  const validatePassword = (pw) => {
+    if (pw.length < 8) return 'Password must be at least 8 characters';
+    if (!/(?=.*[a-z])/.test(pw)) return 'Password must contain a lowercase letter';
+    if (!/(?=.*[A-Z])/.test(pw)) return 'Password must contain an uppercase letter';
+    if (!/(?=.*\d)/.test(pw)) return 'Password must contain a number';
+    return null;
   };
 
   const submit = async (e) => {
@@ -73,143 +99,107 @@ function AuthForm() {
 
     try {
       if (formType === 'register') {
-        // Validate username
         if (!username || username.length < 3) {
-          setMessage('❌ Username is required (minimum 3 characters)');
-          setIsSubmitting(false);
+          setError('Username must be at least 3 characters');
           return;
         }
-
         if (usernameStatus === 'taken') {
-          setMessage('❌ Username is already taken. Please choose another.');
-          setIsSubmitting(false);
+          setError('Username is already taken');
           return;
         }
+        const pwError = validatePassword(password);
+        if (pwError) { setError(pwError); return; }
 
-        // Frontend validation for password
-        if (password.length < 8) {
-          setMessage('❌ Password must be at least 8 characters long');
-          setIsSubmitting(false);
-          return;
-        }
-        if (!/(?=.*[a-z])/.test(password)) {
-          setMessage('❌ Password must contain at least one lowercase letter');
-          setIsSubmitting(false);
-          return;
-        }
-        if (!/(?=.*[A-Z])/.test(password)) {
-          setMessage('❌ Password must contain at least one uppercase letter');
-          setIsSubmitting(false);
-          return;
-        }
-        if (!/(?=.*\d)/.test(password)) {
-          setMessage('❌ Password must contain at least one number');
-          setIsSubmitting(false);
-          return;
-        }
-
-        const res = await umhwApi.post('/auth/register', { 
-          email, 
-          password, 
-          role,
-          username: username.toLowerCase()  // ✅ SEND USERNAME
+        const res = await umhwApi.post('/auth/register', {
+          email, password, role,
+          username: username.toLowerCase()
         });
+        navigate('/verify-email', { state: { email, message: res.data.message } });
 
-        // Redirect to email verification page
-        navigate('/verify-email', {
-          state: {
-            email: email,
-            message: res.data.message
-          }
-        });
-      }
-      else if (formType === 'login') {
+      } else if (formType === 'login') {
         const res = await umhwApi.post('/auth/login', { email, password });
-
-        // Check if 2FA is required
         if (res.data.requires2FA) {
-          navigate('/2fa-login', {
-            state: {
-              userId: res.data.userId,
-              email: res.data.email
-            }
-          });
+          navigate('/2fa-login', { state: { userId: res.data.userId, email: res.data.email } });
           return;
         }
-
-        // Normal login
         sessionStorage.setItem('accessToken', res.data.accessToken);
         sessionStorage.setItem('userEmail', res.data.user.email);
-        window.dispatchEvent(new Event("storage"));
+        window.dispatchEvent(new Event('storage'));
         navigate('/dashboard');
-      }
-      else if (formType === 'forgot') {
+
+      } else if (formType === 'forgot') {
         const res = await umhwApi.post('/auth/request-password-reset', { email });
-        setMessage(res.data.message || '✅ If this email exists, a password reset link has been sent.');
-      }
-      else if (formType === 'reset') {
-        // Frontend validation for reset password
-        if (password.length < 8) {
-          setMessage('❌ Password must be at least 8 characters long');
-          setIsSubmitting(false);
-          return;
-        }
-        if (!/(?=.*[a-z])/.test(password)) {
-          setMessage('❌ Password must contain at least one lowercase letter');
-          setIsSubmitting(false);
-          return;
-        }
-        if (!/(?=.*[A-Z])/.test(password)) {
-          setMessage('❌ Password must contain at least one uppercase letter');
-          setIsSubmitting(false);
-          return;
-        }
-        if (!/(?=.*\d)/.test(password)) {
-          setMessage('❌ Password must contain at least one number');
-          setIsSubmitting(false);
-          return;
-        }
+        setSuccess(res.data.message || 'If this email exists, a reset link has been sent.');
 
+      } else if (formType === 'reset') {
+        const pwError = validatePassword(password);
+        if (pwError) { setError(pwError); return; }
         const res = await umhwApi.post('/auth/reset-password', { token, password });
-        setMessage(res.data.message);
-        setTimeout(() => {
-          setFormType('login');
-        }, 2000);
+        setSuccess(res.data.message);
+        setTimeout(() => setFormType('login'), 2000);
       }
-    } catch (err) {
-      console.error("❌ Error:", err.response?.data || err.message);
 
-      if (err.response?.status === 429) {
-        setMessage(`❌ ${err.response?.data || 'Too many attempts. Please try again in 15 minutes.'}`);
-      }
-      else if (err.response?.data?.errors) {
-        const errorMessages = err.response.data.errors.map(e => e.message).join(', ');
-        setMessage(`❌ ${errorMessages}`);
-      } else if (err.response?.data?.message) {
-        setMessage(`❌ ${err.response.data.message}`);
-      } else {
-        setMessage('❌ An error occurred. Please try again.');
-      }
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.error || 'An error occurred. Please try again.';
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const titles = {
+    login: 'Sign in to your account',
+    register: 'Create a new account',
+    forgot: 'Reset your password',
+    reset: 'Set a new password'
+  };
+
+  const submitIcons = {
+    login: LogIn,
+    register: UserPlus,
+    forgot: Send,
+    reset: KeyRound
+  };
+
+  const submitLabels = {
+    login: 'Sign In',
+    register: 'Create Account',
+    forgot: 'Send Reset Link',
+    reset: 'Reset Password'
+  };
+
+  const SubmitIcon = submitIcons[formType];
+
   return (
     <div className="auth-container">
-      <div className="auth-form">
-        <h2>
-          {formType === 'login' && '🔐 Login'}
-          {formType === 'register' && '📝 Register'}
-          {formType === 'forgot' && '🔑 Forgot Password'}
-          {formType === 'reset' && '🔄 Reset Password'}
-        </h2>
+      <div className="auth-card">
+
+        {/* Brand */}
+        <div className="auth-brand">
+          <div className="auth-brand-logo">
+            <Heart size={20} strokeWidth={2.5} />
+          </div>
+          <span className="auth-brand-name">MediWallet</span>
+        </div>
+
+        {/* Title */}
+        <h1 className="auth-title">{titles[formType]}</h1>
+        <p className="auth-subtitle">
+          {formType === 'login' && 'Welcome back. Enter your credentials to continue.'}
+          {formType === 'register' && 'Join MediWallet to manage your health records securely.'}
+          {formType === 'forgot' && 'Enter your email and we will send a reset link.'}
+          {formType === 'reset' && 'Enter your new password below.'}
+        </p>
 
         <form onSubmit={submit}>
+
+          {/* Email */}
           {(formType === 'login' || formType === 'register' || formType === 'forgot') && (
-            <div className="form-group">
-              <label>Email Address</label>
+            <div className="auth-form-group">
+              <label className="auth-label" htmlFor="email">Email Address</label>
               <input
+                id="email"
+                className="auth-input"
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -221,15 +211,17 @@ function AuthForm() {
             </div>
           )}
 
-          {/* ✅ NEW: USERNAME FIELD (REGISTER ONLY) */}
+          {/* Username */}
           {formType === 'register' && (
-            <div className="form-group">
-              <label>
+            <div className="auth-form-group">
+              <label className="auth-label" htmlFor="username">
                 Username
-                <small>Unique identifier (e.g., john_smith)</small>
+                <small>Used to identify you on the platform</small>
               </label>
-              <div style={{ position: 'relative' }}>
+              <div className="auth-input-wrapper">
                 <input
+                  id="username"
+                  className="auth-input"
                   type="text"
                   value={username}
                   onChange={e => setUsername(e.target.value.toLowerCase())}
@@ -240,60 +232,41 @@ function AuthForm() {
                   disabled={isSubmitting}
                   style={{
                     paddingRight: '40px',
-                    borderColor: usernameStatus === 'available' ? 'var(--success-color)' : 
-                                 usernameStatus === 'taken' ? 'var(--danger-color)' : undefined
+                    borderColor: usernameStatus === 'available'
+                      ? 'var(--color-success)'
+                      : usernameStatus === 'taken'
+                      ? 'var(--color-danger)'
+                      : undefined
                   }}
                 />
-                {usernameStatus === 'checking' && (
-                  <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }}>
-                    ⏳
-                  </span>
-                )}
-                {usernameStatus === 'available' && (
-                  <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--success-color)' }}>
-                    ✓
-                  </span>
-                )}
-                {usernameStatus === 'taken' && (
-                  <span style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--danger-color)' }}>
-                    ✗
-                  </span>
-                )}
+                <span className="auth-input-icon">
+                  {usernameStatus === 'checking' && <Loader size={16} className="spinning" style={{ color: 'var(--color-text-muted)' }} />}
+                  {usernameStatus === 'available' && <Check size={16} style={{ color: 'var(--color-success)' }} />}
+                  {usernameStatus === 'taken' && <X size={16} style={{ color: 'var(--color-danger)' }} />}
+                </span>
               </div>
-              
               {usernameStatus === 'available' && (
-                <p className="helper-text success">
-                  ✓ Username is available!
+                <p className="username-status-available">
+                  <Check size={12} /> Username is available
                 </p>
               )}
-              
               {usernameStatus === 'taken' && (
                 <div>
-                  <p className="helper-text error">
-                    ✗ Username is already taken
+                  <p className="username-status-taken">
+                    <X size={12} /> Username is already taken
                   </p>
                   {usernameSuggestions.length > 0 && (
-                    <div style={{ marginTop: 'var(--spacing-sm)' }}>
-                      <small style={{ color: 'var(--text-secondary)' }}>Try these:</small>
-                      <div style={{ display: 'flex', gap: 'var(--spacing-xs)', flexWrap: 'wrap', marginTop: 'var(--spacing-xs)' }}>
-                        {usernameSuggestions.map(suggestion => (
-                          <button
-                            key={suggestion}
-                            type="button"
-                            onClick={() => setUsername(suggestion)}
-                            style={{
-                              padding: '4px 12px',
-                              background: 'var(--gray-200)',
-                              border: '1px solid var(--gray-300)',
-                              borderRadius: 'var(--border-radius)',
-                              fontSize: 'var(--font-size-xs)',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
+                    <div className="username-suggestions">
+                      {usernameSuggestions.map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          className="username-suggestion-btn"
+                          onClick={() => setUsername(s)}
+                        >
+                          {s}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -301,47 +274,54 @@ function AuthForm() {
             </div>
           )}
 
+          {/* Password */}
           {(formType === 'login' || formType === 'register' || formType === 'reset') && (
-            <div className="form-group">
-              <label>
+            <div className="auth-form-group">
+              <label className="auth-label" htmlFor="password">
                 Password
                 {formType === 'register' && (
-                  <small>
-                    Must be 8+ characters with uppercase, lowercase, and number
-                  </small>
+                  <small>8+ characters with uppercase, lowercase, and number</small>
                 )}
               </label>
               <input
+                id="password"
+                className="auth-input"
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
                 minLength={8}
-                placeholder={formType === 'register' ? 'e.g., MyPass123' : '••••••••'}
+                placeholder="••••••••"
                 disabled={isSubmitting}
                 autoComplete={formType === 'register' ? 'new-password' : 'current-password'}
               />
             </div>
           )}
 
+          {/* Account Type */}
           {formType === 'register' && (
-            <div className="form-group">
-              <label>Account Type</label>
+            <div className="auth-form-group">
+              <label className="auth-label" htmlFor="role">Account Type</label>
               <select
+                id="role"
+                className="auth-select"
                 value={role}
                 onChange={e => setRole(e.target.value)}
                 disabled={isSubmitting}
               >
-                <option value="patient">Patient - Access my health records</option>
-                <option value="doctor">Doctor - Manage patient records</option>
+                <option value="patient">Patient — Access my health records</option>
+                <option value="doctor">Doctor — Manage patient records</option>
               </select>
             </div>
           )}
 
+          {/* Reset Token */}
           {formType === 'reset' && (
-            <div className="form-group">
-              <label>Reset Token</label>
+            <div className="auth-form-group">
+              <label className="auth-label" htmlFor="token">Reset Token</label>
               <input
+                id="token"
+                className="auth-input"
                 value={token}
                 onChange={e => setToken(e.target.value)}
                 required
@@ -351,58 +331,54 @@ function AuthForm() {
             </div>
           )}
 
-          <button type="submit" disabled={isSubmitting || (formType === 'register' && usernameStatus === 'taken')}>
-            {isSubmitting ? (
-              <>⏳ Processing...</>
-            ) : (
-              <>
-                {formType === 'login' && '🚀 Login'}
-                {formType === 'register' && '✨ Create Account'}
-                {formType === 'forgot' && '📧 Send Reset Link'}
-                {formType === 'reset' && '✅ Reset Password'}
-              </>
-            )}
+          {/* Submit */}
+          <button
+            type="submit"
+            className="auth-submit"
+            disabled={isSubmitting || (formType === 'register' && usernameStatus === 'taken')}
+          >
+            {isSubmitting
+              ? <><Loader size={16} className="spinning" /> Processing...</>
+              : <><SubmitIcon size={16} /> {submitLabels[formType]}</>
+            }
           </button>
         </form>
 
+        {/* Message */}
         {message && (
-          <div className={`message ${message.startsWith('✅') ? 'success' : 'error'}`}>
+          <div className={`auth-message ${messageType === 'success' ? 'auth-message-success' : 'auth-message-error'}`}>
+            {messageType === 'success'
+              ? <CheckCircle size={16} />
+              : <AlertCircle size={16} />
+            }
             {message}
           </div>
         )}
 
+        {/* Links */}
         <div className="auth-links">
           {formType === 'login' && (
             <>
-              <p>
-                <button onClick={() => { setFormType('forgot'); setMessage(''); }}>
-                  Forgot Password?
-                </button>
-              </p>
-              <p>
-                <button onClick={toggle}>
-                  Don't have an account? Create one
-                </button>
-              </p>
+              <button className="auth-link-btn" onClick={() => { setFormType('forgot'); setMessage(''); }}>
+                Forgot your password?
+              </button>
+              <button className="auth-link-btn" onClick={toggle}>
+                Don't have an account? Sign up
+              </button>
             </>
           )}
-
           {formType === 'register' && (
-            <p>
-              <button onClick={toggle}>
-                Already have an account? Login
-              </button>
-            </p>
+            <button className="auth-link-btn" onClick={toggle}>
+              Already have an account? Sign in
+            </button>
           )}
-
           {formType === 'forgot' && (
-            <p>
-              <button onClick={() => { setFormType('login'); setMessage(''); }}>
-                ← Back to Login
-              </button>
-            </p>
+            <button className="auth-link-btn" onClick={() => { setFormType('login'); setMessage(''); }}>
+              <ArrowLeft size={13} style={{ display: 'inline', verticalAlign: 'middle' }} /> Back to Sign In
+            </button>
           )}
         </div>
+
       </div>
     </div>
   );
