@@ -1,98 +1,133 @@
 // frontend/src/components/EmergencyQR.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  QrCode, Shield, Clock, Eye, Download, Printer,
+  Trash2, Copy, CheckCircle, AlertTriangle, RefreshCw,
+  Link, Info, X
+} from 'lucide-react';
 import umhwApi from '../api/umhwApi';
 import './EmergencyQR.css';
 
+const DURATION_OPTIONS = [
+  { value: 1,   label: '1 Hour'  },
+  { value: 6,   label: '6 Hours' },
+  { value: 12,  label: '12 Hours' },
+  { value: 24,  label: '24 Hours (Recommended)' },
+  { value: 48,  label: '48 Hours' },
+  { value: 72,  label: '72 Hours' },
+  { value: 168, label: '7 Days' },
+];
+
+const ACCESS_OPTIONS = [
+  { value: 'emergency', label: 'Emergency Info (Allergies, Blood Group, Recent Records)' },
+  { value: 'summary',   label: 'Summary (Last 5 Records Only)' },
+  { value: 'all',       label: 'All Records (Complete Medical History)' },
+];
+
+const formatDate = (dateStr) =>
+  new Date(dateStr).toLocaleString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+
+const isExpired = (expiresAt) => new Date() > new Date(expiresAt);
+
 function EmergencyQR() {
-  const [qrData, setQrData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [activeTokens, setActiveTokens] = useState([]);
+  const [activeCodes, setActiveCodes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [duration, setDuration] = useState(24);
   const [accessScope, setAccessScope] = useState('emergency');
+  const [generatedQR, setGeneratedQR] = useState(null);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    fetchActiveTokens();
-  }, []);
-
-  const fetchActiveTokens = async () => {
+  const fetchCodes = useCallback(async () => {
     try {
       const res = await umhwApi.get('/qr/my-codes');
-      setActiveTokens(res.data.data || []);
-    } catch (err) {
-      console.error('Failed to fetch QR codes:', err);
-    }
-  };
-
-  const generateQR = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const res = await umhwApi.post('/qr/generate', {
-        durationHours: duration,
-        accessScope: accessScope
-      });
-
-      setQrData(res.data.data);
-      fetchActiveTokens();
-      setError('');
-
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to generate QR code');
-      console.error('QR generation error:', err);
+      setActiveCodes(res.data.tokens || []);
+    } catch {
+      setError('Failed to load QR codes.');
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    fetchCodes();
+  }, [fetchCodes]);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    setError('');
+    setGeneratedQR(null);
+    try {
+      const res = await umhwApi.post('/qr/generate', { durationHours: duration, accessScope });
+      setGeneratedQR(res.data);
+      await fetchCodes();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to generate QR code.');
+    } finally {
+      setGenerating(false);
+    }
   };
 
-  const revokeToken = async (tokenId) => {
-    if (!window.confirm('Are you sure you want to revoke this QR code? It will no longer work.')) {
-      return;
-    }
-
+  const handleRevoke = async (tokenId) => {
+    if (!window.confirm('Revoke this QR code? Anyone using this link will lose access.')) return;
     try {
       await umhwApi.delete(`/qr/${tokenId}`);
-      setActiveTokens(activeTokens.filter(t => t.id !== tokenId));
-      if (qrData && qrData.id === tokenId) {
-        setQrData(null);
-      }
-    } catch (err) {
-      setError('Failed to revoke QR code');
+      setActiveCodes(prev => prev.filter(t => t.id !== tokenId));
+      if (generatedQR?.id === tokenId) setGeneratedQR(null);
+    } catch {
+      setError('Failed to revoke QR code.');
     }
   };
 
-  const copyLink = (url) => {
-    navigator.clipboard.writeText(url);
-    alert('✅ Link copied to clipboard!');
+  const handleCopy = async (url) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError('Failed to copy link.');
+    }
   };
 
-  const downloadQR = () => {
-    if (!qrData) return;
-
+  const handleDownload = () => {
+    if (!generatedQR?.qrCodeDataUrl) return;
     const link = document.createElement('a');
-    link.download = `emergency-qr-${new Date().toISOString().split('T')[0]}.png`;
-    link.href = qrData.qrCodeDataUrl;
+    link.href = generatedQR.qrCodeDataUrl;
+    link.download = 'emergency-qr.png';
     link.click();
   };
 
-  return (
-    <div className="emergency-qr-container">
-      <div className="emergency-header">
-        <h3>
-          <span className="emergency-icon">🚨</span>
-          Emergency QR Code
-        </h3>
-        <p className="emergency-subtitle">
-          Generate a secure QR code for emergency medical access
+  const handlePrint = () => {
+    if (!generatedQR?.qrCodeDataUrl) return;
+    const win = window.open('', '_blank');
+    win.document.write(`
+      <html><head><title>Emergency QR Code</title></head>
+      <body style="text-align:center;padding:40px;font-family:sans-serif;">
+        <h2>Emergency Medical QR Code</h2>
+        <p>Scan to access emergency medical information</p>
+        <img src="${generatedQR.qrCodeDataUrl}" style="width:300px;height:300px;" />
+        <p style="margin-top:20px;font-size:12px;color:#666;">
+          This QR code grants read-only access to medical records.<br/>
+          Valid until: ${formatDate(generatedQR.expiresAt)}
         </p>
-      </div>
+      </body></html>
+    `);
+    win.print();
+  };
 
-      <div className="emergency-alert">
-        <span className="alert-icon">⚠️</span>
-        <div className="alert-content">
-          <strong>Important: Emergency Access Only</strong>
+  return (
+    <div className="qr-section">
+
+      {/* Warning banner */}
+      <div className="qr-warning">
+        <AlertTriangle size={16} />
+        <div>
+          <strong>Emergency Access Only</strong>
           <p>
             Anyone with this QR code can view your medical records without logging in.
             Only share during emergencies (ambulance, hospital, etc.).
@@ -102,181 +137,183 @@ function EmergencyQR() {
       </div>
 
       {error && (
-        <div className="emergency-error">
-          <div className="emergency-error-icon">❌</div>
-          <h4>Error</h4>
-          <p>{error}</p>
+        <div className="alert alert-danger" style={{ marginBottom: 'var(--space-4)' }}>
+          <AlertTriangle size={15} /> {error}
         </div>
       )}
 
-      {!qrData && !loading && (
-        <div className="record-form">
+      {/* Generator card */}
+      <div className="qr-generator-card">
+        <div className="qr-generator-header">
+          <QrCode size={18} />
+          <h3>Generate Emergency QR Code</h3>
+        </div>
+
+        <div className="qr-generator-body">
           <div className="form-group">
-            <label>
-              <span>⏰</span>
-              How long should the QR code work?
+            <label className="form-label">
+              <Clock size={14} /> How long should the QR code be valid?
             </label>
             <select
+              className="form-select"
               value={duration}
-              onChange={(e) => setDuration(Number(e.target.value))}
+              onChange={e => setDuration(Number(e.target.value))}
+              disabled={generating}
             >
-              <option value={1}>1 Hour</option>
-              <option value={6}>6 Hours</option>
-              <option value={12}>12 Hours</option>
-              <option value={24}>24 Hours (Recommended)</option>
-              <option value={48}>48 Hours</option>
-              <option value={72}>72 Hours</option>
-              <option value={168}>7 Days</option>
+              {DURATION_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
           </div>
 
           <div className="form-group">
-            <label>
-              <span>📋</span>
-              What information should be shared?
+            <label className="form-label">
+              <Eye size={14} /> What information should be shared?
             </label>
             <select
+              className="form-select"
               value={accessScope}
-              onChange={(e) => setAccessScope(e.target.value)}
+              onChange={e => setAccessScope(e.target.value)}
+              disabled={generating}
             >
-              <option value="emergency">Emergency Info (Allergies, Blood Group, Recent Records)</option>
-              <option value="summary">Summary (Last 5 Records Only)</option>
-              <option value="all">All Records (Complete Medical History)</option>
+              {ACCESS_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
           </div>
 
-          <div className="emergency-actions">
-            <button
-              onClick={generateQR}
-              disabled={loading}
-              className="action-btn btn-download"
-            >
-              {loading ? (
-                <>
-                  <span className="spinner spinner-sm"></span>
-                  <span>Generating...</span>
-                </>
-              ) : (
-                <>
-                  <span>🚨</span>
-                  <span>Generate Emergency QR Code</span>
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            className="btn btn-primary"
+            onClick={handleGenerate}
+            disabled={generating}
+            style={{ width: '100%' }}
+          >
+            {generating
+              ? <><div className="spinner spinner-sm" /> Generating...</>
+              : <><QrCode size={16} /> Generate Emergency QR Code</>
+            }
+          </button>
         </div>
-      )}
+      </div>
 
-      {loading && !qrData && (
-        <div className="emergency-loading">
-          <div className="spinner"></div>
-          <p>Generating secure QR code...</p>
-        </div>
-      )}
-
-      {qrData && (
-        <div className="qr-code-display">
-          <h4 style={{ color: 'var(--success-color)', marginBottom: 'var(--spacing-md)' }}>
-            ✅ QR Code Generated!
-          </h4>
-
-          <div className="qr-code-wrapper">
-            <img
-              src={qrData.qrCodeDataUrl}
-              alt="Emergency QR Code"
-            />
-          </div>
-          <p className="qr-code-label">Scan with any QR code reader</p>
-
-          <div className="token-display">
-            <div className="token-label">Share Link</div>
-            <div className="token-value">{qrData.shareUrl}</div>
-            <button
-              onClick={() => copyLink(qrData.shareUrl)}
-              className="action-btn btn-share"
-              style={{ marginTop: 'var(--spacing-md)', width: '100%' }}
-            >
-              <span>📋</span>
-              <span>Copy Link</span>
+      {/* Generated QR result */}
+      {generatedQR && (
+        <div className="qr-result-card">
+          <div className="qr-result-header">
+            <CheckCircle size={18} style={{ color: 'var(--color-success)' }} />
+            <h3>QR Code Generated</h3>
+            <button className="btn btn-ghost btn-sm qr-close-btn" onClick={() => setGeneratedQR(null)}>
+              <X size={16} />
             </button>
           </div>
 
-          <div className="emergency-instructions">
-            <h4>
-              <span>📅</span>
-              QR Code Details
-            </h4>
-            <ol>
-              <li><strong>Expires:</strong> {new Date(qrData.expiresAt).toLocaleString()}</li>
-              <li><strong>Duration:</strong> {qrData.durationHours} hours</li>
-              <li><strong>Access Level:</strong> {qrData.accessScope}</li>
-            </ol>
-          </div>
+          <div className="qr-result-body">
+            <div className="qr-image-container">
+              <img src={generatedQR.qrCodeDataUrl} alt="Emergency QR Code" className="qr-image" />
+            </div>
 
-          <div className="emergency-actions">
-            <button
-              onClick={downloadQR}
-              className="action-btn btn-download"
-            >
-              <span>💾</span>
-              <span>Download QR Code</span>
-            </button>
+            <div className="qr-result-details">
+              <div className="qr-detail-row">
+                <Clock size={14} />
+                <span>Expires: {formatDate(generatedQR.expiresAt)}</span>
+              </div>
+              <div className="qr-detail-row">
+                <Eye size={14} />
+                <span>Access: {ACCESS_OPTIONS.find(o => o.value === generatedQR.accessScope)?.label}</span>
+              </div>
+              <div className="qr-detail-row">
+                <Shield size={14} />
+                <span>Duration: {generatedQR.durationHours} hour{generatedQR.durationHours > 1 ? 's' : ''}</span>
+              </div>
 
-            <button
-              onClick={() => window.print()}
-              className="action-btn btn-print"
-            >
-              <span>🖨️</span>
-              <span>Print QR Code</span>
-            </button>
+              <div className="qr-share-link">
+                <Link size={13} />
+                <span className="qr-share-url">{generatedQR.shareUrl}</span>
+              </div>
 
-            <button
-              onClick={() => setQrData(null)}
-              className="action-btn btn-secondary"
-            >
-              <span>✕</span>
-              <span>Close</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {activeTokens.length > 0 && (
-        <div style={{ marginTop: 'var(--spacing-2xl)' }}>
-          <h4 style={{ marginBottom: 'var(--spacing-lg)' }}>
-            Active Emergency QR Codes ({activeTokens.length})
-          </h4>
-          {activeTokens.map(token => (
-            <div
-              key={token.id}
-              className="card"
-              style={{ marginBottom: 'var(--spacing-md)', padding: 'var(--spacing-lg)' }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 'var(--spacing-md)' }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ margin: '0 0 var(--spacing-xs) 0', fontSize: 'var(--font-size-sm)' }}>
-                    <strong>Created:</strong> {new Date(token.createdAt).toLocaleString()}
-                  </p>
-                  <p style={{ margin: '0 0 var(--spacing-xs) 0', fontSize: 'var(--font-size-sm)' }}>
-                    <strong>Expires:</strong> {new Date(token.expiresAt).toLocaleString()}
-                  </p>
-                  <p style={{ margin: '0', fontSize: 'var(--font-size-sm)' }}>
-                    <strong>Used:</strong> {token.usageCount} times
-                  </p>
-                </div>
+              <div className="qr-result-actions">
                 <button
-                  onClick={() => revokeToken(token.id)}
-                  className="btn-delete"
-                  style={{ flexShrink: 0 }}
+                  className={`btn btn-secondary btn-sm ${copied ? 'btn-success-state' : ''}`}
+                  onClick={() => handleCopy(generatedQR.shareUrl)}
                 >
-                  <span>🗑️</span>
-                  <span>Revoke</span>
+                  {copied ? <CheckCircle size={13} /> : <Copy size={13} />}
+                  {copied ? 'Copied!' : 'Copy Link'}
+                </button>
+                <button className="btn btn-secondary btn-sm" onClick={handleDownload}>
+                  <Download size={13} /> Download
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={handlePrint}>
+                  <Printer size={13} /> Print
                 </button>
               </div>
             </div>
-          ))}
+          </div>
         </div>
       )}
+
+      {/* Active codes list */}
+      <div className="qr-active-section">
+        <div className="qr-active-header">
+          <h3>
+            Active QR Codes
+            {activeCodes.filter(t => !isExpired(t.expiresAt)).length > 0 && (
+              <span className="badge badge-primary" style={{ marginLeft: 'var(--space-2)' }}>
+                {activeCodes.filter(t => !isExpired(t.expiresAt)).length}
+              </span>
+            )}
+          </h3>
+          <button className="btn btn-ghost btn-sm" onClick={fetchCodes}>
+            <RefreshCw size={14} />
+          </button>
+        </div>
+
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+            <div className="spinner spinner-sm" /> Loading...
+          </div>
+        ) : activeCodes.length === 0 ? (
+          <div className="qr-empty">
+            <QrCode size={32} />
+            <p>No active QR codes. Generate one above.</p>
+          </div>
+        ) : (
+          <div className="qr-codes-list">
+            {activeCodes.map(token => {
+              const expired = isExpired(token.expiresAt);
+              return (
+                <div key={token.id} className={`qr-code-item ${expired ? 'qr-code-expired' : ''}`}>
+                  <div className="qr-code-info">
+                    <div className="qr-code-status-dot" style={{
+                      background: expired ? 'var(--color-text-muted)' : 'var(--color-success)'
+                    }} />
+                    <div>
+                      <div className="qr-code-dates">
+                        <span>Created: {formatDate(token.createdAt)}</span>
+                        <span>·</span>
+                        <span className={expired ? 'qr-expired-text' : ''}>
+                          {expired ? 'Expired' : `Expires: ${formatDate(token.expiresAt)}`}
+                        </span>
+                      </div>
+                      <div className="qr-code-uses">
+                        <Eye size={12} /> Used {token.useCount || 0} time{(token.useCount || 0) !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  </div>
+                  {!expired && (
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => handleRevoke(token.id)}
+                    >
+                      <Trash2 size={13} /> Revoke
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
