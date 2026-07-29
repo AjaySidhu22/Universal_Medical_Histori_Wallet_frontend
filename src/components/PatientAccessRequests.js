@@ -1,303 +1,254 @@
 // frontend/src/components/PatientAccessRequests.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Stethoscope, Clock, CheckCircle, XCircle, AlertCircle,
+  Calendar, Timer, MessageSquare, Activity, Check, X,
+  RefreshCw, ChevronDown
+} from 'lucide-react';
 import umhwApi from '../api/umhwApi';
 import './PatientAccessRequests.css';
-import Pagination from './Pagination';  
+
+const STATUS_FILTERS = ['All', 'Pending', 'Approved', 'Denied'];
+
+const getStatusInfo = (status, expiresAt) => {
+  const isExpired = new Date() > new Date(expiresAt);
+  if (isExpired && (status === 'approved' || status === 'pending')) {
+    return { label: 'Expired', icon: AlertCircle, className: 'status-expired' };
+  }
+  switch (status) {
+    case 'approved': return { label: 'Approved', icon: CheckCircle, className: 'status-approved' };
+    case 'denied':   return { label: 'Denied',   icon: XCircle,     className: 'status-denied'   };
+    default:         return { label: 'Pending',  icon: Clock,       className: 'status-pending'  };
+  }
+};
+
+const formatDate = (dateStr) =>
+  new Date(dateStr).toLocaleString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
 
 function PatientAccessRequests() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState('All');
+  const [respondingId, setRespondingId] = useState(null);
   const [message, setMessage] = useState('');
-  const [customDurations, setCustomDurations] = useState({});
-  const [filter, setFilter] = useState('all'); // all, pending, approved, denied
-  const [currentPage, setCurrentPage] = useState(1); // ✅ ADD
-  const [pagination, setPagination] = useState(null); // ✅ ADD
+  const [messageType, setMessageType] = useState('success');
 
-  const fetchRequests = async (page = 1) => { // ✅ ADD page parameter
+  const fetchRequests = useCallback(async () => {
     try {
-      setLoading(true);
-      const res = await umhwApi.get(`/access-requests/my-requests?page=${page}&limit=5`); // ✅ CHANGE
-      setRequests(res.data.data); // ✅ CHANGE (now data.data)
-      setPagination(res.data.pagination); // ✅ ADD
-      setCurrentPage(page); // ✅ ADD
-    } catch (err) {
-      console.error('Failed to fetch requests:', err);
-      setMessage('❌ Failed to load access requests');
+      const res = await umhwApi.get('/access-requests/my-requests?page=1&limit=50');
+      setRequests(res.data.data || []);
+    } catch {
+      setMessage('Failed to load access requests.');
+      setMessageType('error');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-  fetchRequests(1); // ✅ Start at page 1
-}, []);
+    fetchRequests();
+  }, [fetchRequests]);
 
-  const handleRespond = async (requestId, action, requestedDuration) => {
-    if (action === 'deny') {
-      if (!window.confirm('Deny access to this doctor?')) return;
-
-      try {
-        await umhwApi.put(`/access-requests/${requestId}/respond`, { action });
-        setMessage('✅ Request denied successfully');
-        fetchRequests();
-        setTimeout(() => setMessage(''), 3000);
-      } catch (err) {
-        setMessage(`❌ Failed to deny request: ${err.response?.data?.message || err.message}`);
-      }
-      return;
-    }
-
-    const customDuration = customDurations[requestId] || requestedDuration;
-    const confirmMessage = `Allow this doctor to access your medical records for ${getDurationLabel(customDuration)}?`;
-
-    if (!window.confirm(confirmMessage)) return;
-
+  const handleRespond = async (requestId, action) => {
+    setRespondingId(requestId);
     try {
-      await umhwApi.put(`/access-requests/${requestId}/respond`, {
-        action,
-        customDurationHours: customDuration
-      });
-      setMessage(`✅ Request approved for ${getDurationLabel(customDuration)}`);
-      fetchRequests();
-      setTimeout(() => setMessage(''), 3000);
+      await umhwApi.put(`/access-requests/${requestId}/respond`, { action });
+      setMessage(`Request ${action === 'approve' ? 'approved' : 'denied'} successfully.`);
+      setMessageType('success');
+      await fetchRequests();
     } catch (err) {
-      setMessage(`❌ Failed to approve request: ${err.response?.data?.message || err.message}`);
+      setMessage(err.response?.data?.message || 'Failed to respond to request.');
+      setMessageType('error');
+    } finally {
+      setRespondingId(null);
+      setTimeout(() => setMessage(''), 4000);
     }
   };
 
-  const getDurationLabel = (hours) => {
-    if (hours === 0.5) return '30 Minutes';
-    if (hours === 1) return '1 Hour';
-    if (hours === 24) return '24 Hours (1 Day)';
-    if (hours === 48) return '48 Hours (2 Days)';
-    if (hours === 72) return '72 Hours (3 Days)';
-    if (hours === 168) return '1 Week';
-    if (hours === 336) return '2 Weeks';
-    if (hours === 720) return '30 Days';
-    return `${hours} Hours`;
-  };
-
-  const getStatusBadge = (status, expiresAt) => {
-    const isExpired = new Date() > new Date(expiresAt);
-
-    if (isExpired && (status === 'pending' || status === 'approved')) {
-      return <span className="status-badge status-rejected">⏰ Expired</span>;
-    }
-
-    const statusMap = {
-      pending: <span className="status-badge status-pending">⏳ Pending</span>,
-      approved: <span className="status-badge status-approved">✅ Approved</span>,
-      denied: <span className="status-badge status-rejected">❌ Denied</span>
-    };
-
-    return statusMap[status] || null;
-  };
-
-  const filteredRequests = requests.filter(req => {
-    if (filter === 'all') return true;
-    const isExpired = new Date() > new Date(req.expiresAt);
-    if (filter === 'pending') return req.status === 'pending' && !isExpired;
-    return req.status === filter;
+  const filtered = requests.filter(r => {
+    if (activeFilter === 'All') return true;
+    return r.status?.toLowerCase() === activeFilter.toLowerCase();
   });
 
-  const pendingCount = requests.filter(r => r.status === 'pending' && new Date() <= new Date(r.expiresAt)).length;
+  const counts = {
+    All: requests.length,
+    Pending: requests.filter(r => r.status === 'pending').length,
+    Approved: requests.filter(r => r.status === 'approved').length,
+    Denied: requests.filter(r => r.status === 'denied').length,
+  };
 
   if (loading) {
     return (
-      <div className="loading-state">
-        <div className="spinner"></div>
+      <div className="access-loading">
+        <div className="spinner" />
         <p>Loading access requests...</p>
       </div>
     );
   }
 
   return (
-    <div className="access-requests-container">
-      <div className="access-requests-header">
-        <h3>
-          <span className="header-icon">📋</span>
-          Access Requests from Doctors
-        </h3>
-        <p className="header-subtitle">
-          Manage which doctors can access your medical records
-        </p>
+    <div className="access-requests">
+
+      {/* Header */}
+      <div className="access-header">
+        <div>
+          <h2 className="access-title">Access Requests</h2>
+          <p className="access-subtitle">
+            Manage which doctors can view and create your medical records.
+          </p>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={fetchRequests}>
+          <RefreshCw size={14} /> Refresh
+        </button>
       </div>
 
+      {/* Message */}
       {message && (
-        <div className={`message ${message.includes('✅') ? 'success' : 'error'}`}>
+        <div className={`alert ${messageType === 'success' ? 'alert-success' : 'alert-danger'}`}
+          style={{ marginBottom: 'var(--space-5)' }}>
+          {messageType === 'success' ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
           {message}
         </div>
       )}
 
-      {/* Filter Tabs */}
-      <div className="filter-tabs">
-        <button
-          className={`filter-tab ${filter === 'all' ? 'active' : ''}`}
-          onClick={() => setFilter('all')}
-        >
-          All
-          {requests.length > 0 && <span className="tab-badge">{requests.length}</span>}
-        </button>
-        <button
-          className={`filter-tab ${filter === 'pending' ? 'active' : ''}`}
-          onClick={() => setFilter('pending')}
-        >
-          Pending
-          {pendingCount > 0 && <span className="tab-badge">{pendingCount}</span>}
-        </button>
-        <button
-          className={`filter-tab ${filter === 'approved' ? 'active' : ''}`}
-          onClick={() => setFilter('approved')}
-        >
-          Approved
-        </button>
-        <button
-          className={`filter-tab ${filter === 'denied' ? 'active' : ''}`}
-          onClick={() => setFilter('denied')}
-        >
-          Denied
-        </button>
+      {/* Filter tabs */}
+      <div className="access-filters">
+        {STATUS_FILTERS.map(filter => (
+          <button
+            key={filter}
+            className={`access-filter-btn ${activeFilter === filter ? 'access-filter-active' : ''}`}
+            onClick={() => setActiveFilter(filter)}
+          >
+            {filter}
+            {counts[filter] > 0 && (
+              <span className="access-filter-count">{counts[filter]}</span>
+            )}
+          </button>
+        ))}
       </div>
 
-      {filteredRequests.length === 0 ? (
+      {/* Requests list */}
+      {filtered.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-icon">📋</div>
-          <h4>No {filter !== 'all' ? filter : ''} requests</h4>
-          <p>
-            {filter === 'all' 
-              ? 'Doctors will appear here when they request access to your records'
-              : `You have no ${filter} access requests`}
-          </p>
+          <Stethoscope size={40} className="empty-state-icon" />
+          <h3>No {activeFilter !== 'All' ? activeFilter.toLowerCase() : ''} requests</h3>
+          <p>Doctors will appear here when they request access to your records.</p>
         </div>
       ) : (
-        <div className="requests-list">
-          {filteredRequests.map(request => {
-            const isExpired = new Date() > new Date(request.expiresAt);
-            const isPending = request.status === 'pending' && !isExpired;
-            const requestedDurationHours = request.requestedDuration || 
-              Math.round((new Date(request.expiresAt) - new Date(request.createdAt)) / (1000 * 60 * 60));
+        <div className="access-list">
+          {filtered.map(request => {
+            const statusInfo = getStatusInfo(request.status, request.expiresAt);
+            const StatusIcon = statusInfo.icon;
+            const isPending = request.status === 'pending' &&
+              new Date() < new Date(request.expiresAt);
+            const isResponding = respondingId === request.id;
 
             return (
-              <div
-                key={request.id}
-                className={`request-card ${request.status}`}
-              >
-                <div className="request-header">
-                  <div className="doctor-info">
-                    <div className="doctor-name">
-                      👨‍⚕️ {request.DoctorProfile?.name?.startsWith('Dr.')
-                        ? request.DoctorProfile.name
-                        : `Dr. ${request.DoctorProfile?.name || 'Unknown'}`}
+              <div key={request.id} className={`access-card ${statusInfo.className}`}>
+
+                {/* Card header */}
+                <div className="access-card-header">
+                  <div className="access-doctor-info">
+                    <div className="access-doctor-avatar">
+                      <Stethoscope size={16} />
                     </div>
-                    <div className="doctor-specialty">
-                      🏥 {request.DoctorProfile?.specialty}
-                    </div>
-                    <div className="doctor-license">
-                      📧 {request.DoctorProfile?.User?.email}
+                    <div>
+                      <div className="access-doctor-name">
+                        {request.DoctorProfile?.name?.startsWith('Dr.')
+                          ? request.DoctorProfile.name
+                          : `Dr. ${request.DoctorProfile?.name || 'Unknown'}`}
+                      </div>
+                      <div className="access-doctor-specialty">
+                        {request.DoctorProfile?.specialty || 'General Practice'}
+                      </div>
+                      <div className="access-doctor-email">
+                        {request.DoctorProfile?.User?.email}
+                      </div>
                     </div>
                   </div>
-                  <div className="request-status">
-                    {getStatusBadge(request.status, request.expiresAt)}
-                  </div>
+                  <span className={`access-status-badge ${statusInfo.className}`}>
+                    <StatusIcon size={12} />
+                    {statusInfo.label}
+                  </span>
                 </div>
 
-                <div className="request-details">
-                  <div className="detail-row">
-                    <span className="detail-icon">📋</span>
-                    <strong>Access Type:</strong> {request.requestType.charAt(0).toUpperCase() + request.requestType.slice(1)} records
+                {/* Card details */}
+                <div className="access-card-details">
+                  <div className="access-detail">
+                    <Activity size={13} />
+                    <span className="access-detail-label">Access Type</span>
+                    <span className="access-detail-value">
+                      {request.requestType === 'both' ? 'View & Create'
+                        : request.requestType === 'view' ? 'View Only'
+                        : 'Create Only'}
+                    </span>
                   </div>
-                  <div className="detail-row">
-                    <span className="detail-icon">⏰</span>
-                    <strong>Duration:</strong> {getDurationLabel(requestedDurationHours)}
+                  <div className="access-detail">
+                    <Timer size={13} />
+                    <span className="access-detail-label">Duration</span>
+                    <span className="access-detail-value">
+                      {request.requestedDuration < 24
+                        ? `${request.requestedDuration} hour${request.requestedDuration > 1 ? 's' : ''}`
+                        : `${request.requestedDuration / 24} day${request.requestedDuration / 24 > 1 ? 's' : ''}`}
+                    </span>
                   </div>
                   {request.reason && (
-                    <div className="detail-row">
-                      <span className="detail-icon">💬</span>
-                      <strong>Reason:</strong> {request.reason}
+                    <div className="access-detail">
+                      <MessageSquare size={13} />
+                      <span className="access-detail-label">Reason</span>
+                      <span className="access-detail-value">{request.reason}</span>
                     </div>
                   )}
-                  <div className="detail-row">
-                    <span className="detail-icon">📅</span>
-                    <strong>Requested:</strong> {new Date(request.createdAt).toLocaleString()}
+                  <div className="access-detail">
+                    <Calendar size={13} />
+                    <span className="access-detail-label">Requested</span>
+                    <span className="access-detail-value">{formatDate(request.createdAt)}</span>
                   </div>
-                  <div className="detail-row">
-                    <span className="detail-icon">⏳</span>
-                    <strong>Expires:</strong> {new Date(request.expiresAt).toLocaleString()}
+                  <div className="access-detail">
+                    <Clock size={13} />
+                    <span className="access-detail-label">Expires</span>
+                    <span className="access-detail-value">{formatDate(request.expiresAt)}</span>
                   </div>
                 </div>
 
+                {/* Approval actions */}
                 {isPending && (
-                  <>
-                    <div className="form-group" style={{ marginTop: 'var(--spacing-md)' }}>
-                      <label>
-                        <span>⏰</span>
-                        Approve for how long?
-                      </label>
-                      <select
-                        value={customDurations[request.id] || requestedDurationHours}
-                        onChange={(e) => setCustomDurations({
-                          ...customDurations,
-                          [request.id]: Number(e.target.value)
-                        })}
-                      >
-                        <option value={0.5}>30 Minutes</option>
-                        <option value={1}>1 Hour</option>
-                        <option value={24}>24 Hours (1 Day)</option>
-                        <option value={48}>48 Hours (2 Days)</option>
-                        <option value={72}>72 Hours (3 Days)</option>
-                        <option value={168}>1 Week</option>
-                        <option value={336}>2 Weeks</option>
-                        <option value={720}>30 Days</option>
-                      </select>
-                      <p className="helper-text info">
-                        💡 Doctor requested: {getDurationLabel(requestedDurationHours)}
-                      </p>
-                    </div>
-
-                    <div className="request-actions">
-                      <button
-                        onClick={() => handleRespond(request.id, 'approve', requestedDurationHours)}
-                        className="action-btn btn-approve"
-                      >
-                        <span>✅</span>
-                        <span>Approve Access</span>
-                      </button>
-                      <button
-                        onClick={() => handleRespond(request.id, 'deny')}
-                        className="action-btn btn-reject"
-                      >
-                        <span>❌</span>
-                        <span>Deny Access</span>
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {request.status === 'approved' && (
-                  <div className="alert alert-success" style={{ marginTop: 'var(--spacing-md)' }}>
-                    ✅ You approved this request on {new Date(request.respondedAt).toLocaleString()}
+                  <div className="access-card-actions">
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleRespond(request.id, 'approve')}
+                      disabled={isResponding}
+                    >
+                      {isResponding
+                        ? <><div className="spinner spinner-sm" /> Processing...</>
+                        : <><Check size={13} /> Approve</>}
+                    </button>
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => handleRespond(request.id, 'deny')}
+                      disabled={isResponding}
+                    >
+                      <X size={13} /> Deny
+                    </button>
                   </div>
                 )}
 
-                {request.status === 'denied' && (
-                  <div className="alert alert-danger" style={{ marginTop: 'var(--spacing-md)' }}>
-                    ❌ You denied this request on {new Date(request.respondedAt).toLocaleString()}
+                {/* Responded note */}
+                {request.respondedAt && (
+                  <div className="access-responded-note">
+                    <CheckCircle size={13} />
+                    You {request.status} this request on {formatDate(request.respondedAt)}
                   </div>
                 )}
+
               </div>
             );
           })}
-         </div>
-      )}
-
-      {/* ✅ ADD Pagination */}
-      {pagination && pagination.totalPages > 1 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={pagination.totalPages}
-          onPageChange={(page) => fetchRequests(page)}
-        />
+        </div>
       )}
     </div>
   );
