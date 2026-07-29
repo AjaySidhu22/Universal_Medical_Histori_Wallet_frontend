@@ -1,359 +1,394 @@
 // frontend/src/components/TwoFactorSettings.js
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Shield, ShieldCheck, ShieldOff, Key, RefreshCw,
+  Smartphone, CheckCircle, AlertCircle, Lock, Copy,
+  ChevronLeft, Eye, EyeOff
+} from 'lucide-react';
 import umhwApi from '../api/umhwApi';
 import './TwoFactorSettings.css';
 
 function TwoFactorSettings() {
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showSetup, setShowSetup] = useState(false);
+  const navigate = useNavigate();
+  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [step, setStep] = useState('status');
   const [qrCodeUrl, setQrCodeUrl] = useState('');
-  const [backupCodes, setBackupCodes] = useState([]);
-  const [verificationCode, setVerificationCode] = useState('');
+  const [verifyCode, setVerifyCode] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [backupCodes, setBackupCodes] = useState([]);
   const [message, setMessage] = useState('');
-  const [step, setStep] = useState(1); // 1: QR, 2: Verify, 3: Backup Codes
+  const [messageType, setMessageType] = useState('success');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Check 2FA status on component mount
   useEffect(() => {
-    checkTwoFactorStatus();
+    const fetchStatus = async () => {
+      try {
+        const res = await umhwApi.get('/profile/profile');
+        setIs2FAEnabled(res.data.user?.twoFactorEnabled || false);
+      } catch {
+        setMessage('Failed to load 2FA status.');
+        setMessageType('error');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStatus();
   }, []);
 
-  const checkTwoFactorStatus = async () => {
-  try {
-    const res = await umhwApi.get('/profile/profile');
-    // ✅ FIXED: Check user object directly, not nested
-    const userTwoFactorEnabled = res.data.user?.twoFactorEnabled || false;
-    console.log('2FA Status:', userTwoFactorEnabled); // Debug log
-    setTwoFactorEnabled(userTwoFactorEnabled);
-    setIsLoading(false);
-  } catch (err) {
-    console.error('Failed to check 2FA status:', err);
-    setIsLoading(false);
-  }
-};
+  const setSuccess = (msg) => { setMessage(msg); setMessageType('success'); };
+  const setError = (msg) => { setMessage(msg); setMessageType('error'); };
 
-  // Enable 2FA - Get QR Code
-  const handleEnable2FA = async () => {
+  const handleEnable = async () => {
+    setIsSubmitting(true);
     setMessage('');
-    setIsLoading(true);
-
     try {
       const res = await umhwApi.post('/auth/2fa/enable');
-      
-      setQrCodeUrl(res.data.qrCodeUrl);
-      setBackupCodes(res.data.backupCodes);
-      setShowSetup(true);
-      setStep(1);
-      setMessage('');
-      
+      setQrCodeUrl(res.data.qrCode);
+      setStep('scan');
     } catch (err) {
-      console.error('Enable 2FA error:', err);
-      setMessage(err.response?.data?.message || '❌ Failed to enable 2FA');
+      setError(err.response?.data?.message || 'Failed to initiate 2FA setup.');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  // Verify 2FA Setup
-  const handleVerify2FA = async (e) => {
-    e.preventDefault();
-    setMessage('');
-
-    if (verificationCode.length !== 6) {
-      setMessage('❌ Code must be 6 digits');
+  const handleVerify = async () => {
+    if (!verifyCode || verifyCode.length !== 6) {
+      setError('Please enter a valid 6-digit code.');
       return;
     }
-
-    setIsLoading(true);
-
-    try {
-      const res = await umhwApi.post('/auth/2fa/verify', {
-        token: verificationCode
-      });
-
-      setMessage('✅ ' + res.data.message);
-      setStep(3); // Show backup codes
-      setVerificationCode('');
-      
-    } catch (err) {
-      console.error('Verify 2FA error:', err);
-      setMessage(err.response?.data?.message || '❌ Invalid verification code');
-      setVerificationCode('');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Complete Setup
-  const handleCompleteSetup = () => {
-    setTwoFactorEnabled(true);
-    setShowSetup(false);
-    setStep(1);
-    setQrCodeUrl('');
-    setBackupCodes([]);
-    setMessage('✅ 2FA enabled successfully!');
-  };
-
-  // Disable 2FA
-  const handleDisable2FA = async (e) => {
-    e.preventDefault();
+    setIsSubmitting(true);
     setMessage('');
-
-    if (!password) {
-      setMessage('❌ Password is required');
-      return;
-    }
-
-    setIsLoading(true);
-
     try {
-      const res = await umhwApi.post('/auth/2fa/disable', { password });
-      
-      setTwoFactorEnabled(false);
-      setPassword('');
-      setMessage('✅ ' + res.data.message);
-      
+      const res = await umhwApi.post('/auth/2fa/verify', { token: verifyCode });
+      setBackupCodes(res.data.backupCodes || []);
+      setIs2FAEnabled(true);
+      setStep('backup');
+      setSuccess('Two-factor authentication enabled successfully.');
     } catch (err) {
-      console.error('Disable 2FA error:', err);
-      setMessage(err.response?.data?.message || '❌ Failed to disable 2FA');
-      setPassword('');
+      setError(err.response?.data?.message || 'Invalid code. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  // Regenerate Backup Codes
-  const handleRegenerateBackupCodes = async (e) => {
-    e.preventDefault();
+  const handleDisable = async () => {
+    if (!password) { setError('Please enter your password.'); return; }
+    setIsSubmitting(true);
     setMessage('');
-
-    if (!password) {
-      setMessage('❌ Password is required');
-      return;
-    }
-
-    setIsLoading(true);
-
     try {
-      const res = await umhwApi.post('/auth/2fa/regenerate-backup-codes', { password });
-      
-      setBackupCodes(res.data.backupCodes);
+      await umhwApi.post('/auth/2fa/disable', { password });
+      setIs2FAEnabled(false);
+      setStep('status');
       setPassword('');
-      setStep(3); // Show new backup codes
-      setShowSetup(true);
-      setMessage('✅ ' + res.data.message);
-      
+      setSuccess('Two-factor authentication disabled.');
     } catch (err) {
-      console.error('Regenerate codes error:', err);
-      setMessage(err.response?.data?.message || '❌ Failed to regenerate backup codes');
-      setPassword('');
+      setError(err.response?.data?.message || 'Failed to disable 2FA.');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  // Download Backup Codes
-  const handleDownloadBackupCodes = () => {
-    const content = `Universal Medical Wallet - 2FA Backup Codes\n\n` +
-                    `Generated: ${new Date().toLocaleString()}\n\n` +
-                    `IMPORTANT: Store these codes in a safe place!\n` +
-                    `Each code can only be used once.\n\n` +
-                    `Backup Codes:\n` +
-                    backupCodes.map((code, i) => `${i + 1}. ${code}`).join('\n');
-
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `2fa-backup-codes-${Date.now()}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleRegenerate = async () => {
+    if (!password) { setError('Please enter your password.'); return; }
+    setIsSubmitting(true);
+    setMessage('');
+    try {
+      const res = await umhwApi.post('/auth/2fa/regenerate-backup', { password });
+      setBackupCodes(res.data.backupCodes || []);
+      setStep('backup');
+      setPassword('');
+      setSuccess('New backup codes generated. Save them securely.');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to regenerate backup codes.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (isLoading && !showSetup) {
-    return <div className="two-factor-loading">Loading 2FA settings...</div>;
+  const handleCopyBackupCodes = async () => {
+    try {
+      await navigator.clipboard.writeText(backupCodes.join('\n'));
+      setSuccess('Backup codes copied to clipboard.');
+    } catch {
+      setError('Failed to copy codes.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="tfa-page page-content">
+        <div className="container">
+          <div className="page-loading">
+            <div className="spinner spinner-lg" />
+            <p>Loading 2FA settings...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="two-factor-settings">
-      <h2>🔐 Two-Factor Authentication</h2>
-      
-      {!showSetup && (
-        <div className="two-factor-status">
-          <div className={`status-badge ${twoFactorEnabled ? 'enabled' : 'disabled'}`}>
-            {twoFactorEnabled ? '✅ Enabled' : '❌ Disabled'}
-          </div>
-          
-          <p className="status-description">
-            {twoFactorEnabled 
-              ? 'Your account is protected with two-factor authentication.'
-              : 'Add an extra layer of security to your account.'}
-          </p>
+    <div className="tfa-page page-content">
+      <div className="container">
 
-          {!twoFactorEnabled ? (
-            <div className="enable-section">
-              <h3>Enable 2FA</h3>
-              <p>
-                Two-factor authentication adds an extra layer of security by requiring 
-                a code from your phone in addition to your password.
-              </p>
-              <button 
-                onClick={handleEnable2FA}
-                className="btn-primary"
-                disabled={isLoading}
-              >
-                {isLoading ? '⏳ Setting up...' : '🔒 Enable 2FA'}
-              </button>
+        {/* Back button */}
+        <button
+          className="btn btn-ghost btn-sm tfa-back-btn"
+          onClick={() => navigate('/dashboard')}
+        >
+          <ChevronLeft size={16} /> Back to Dashboard
+        </button>
+
+        <div className="tfa-card">
+
+          {/* Header */}
+          <div className="tfa-card-header">
+            <div className="tfa-header-icon">
+              <Shield size={22} />
             </div>
-          ) : (
-            <div className="manage-section">
-              <h3>Manage 2FA</h3>
-              
-              {/* Regenerate Backup Codes */}
-              <div className="action-card">
-                <h4>🔄 Regenerate Backup Codes</h4>
-                <p>Generate new backup codes (old codes will be invalidated)</p>
-                <form onSubmit={handleRegenerateBackupCodes}>
-                  <input
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                  />
-                  <button type="submit" disabled={isLoading}>
-                    {isLoading ? '⏳ Regenerating...' : 'Regenerate Codes'}
-                  </button>
-                </form>
-              </div>
+            <div>
+              <h1 className="tfa-title">Two-Factor Authentication</h1>
+              <p className="tfa-subtitle">
+                Add an extra layer of security to your account.
+              </p>
+            </div>
+            <span className={`badge ${is2FAEnabled ? 'badge-success' : 'badge-danger'}`}>
+              {is2FAEnabled ? <><ShieldCheck size={11} /> Enabled</> : <><ShieldOff size={11} /> Disabled</>}
+            </span>
+          </div>
 
-              {/* Disable 2FA */}
-              <div className="action-card danger">
-                <h4>🚫 Disable 2FA</h4>
-                <p>Remove two-factor authentication from your account</p>
-                <form onSubmit={handleDisable2FA}>
-                  <input
-                    type="password"
-                    placeholder="Enter your password to confirm"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                  />
-                  <button type="submit" className="btn-danger" disabled={isLoading}>
-                    {isLoading ? '⏳ Disabling...' : 'Disable 2FA'}
-                  </button>
-                </form>
-              </div>
+          {/* Message */}
+          {message && (
+            <div className={`alert ${messageType === 'success' ? 'alert-success' : 'alert-danger'} tfa-message`}>
+              {messageType === 'success' ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
+              {message}
             </div>
           )}
-        </div>
-      )}
 
-      {showSetup && (
-        <div className="two-factor-setup">
-          {/* Step 1: Scan QR Code */}
-          {step === 1 && (
-            <div className="setup-step">
-              <h3>Step 1: Scan QR Code</h3>
-              <p>Use Google Authenticator or Authy to scan this QR code:</p>
-              
-              {qrCodeUrl && (
-                <div className="qr-code-container">
-                  <img src={qrCodeUrl} alt="2FA QR Code" />
+          {/* Step: Status */}
+          {step === 'status' && (
+            <div className="tfa-card-body">
+              {!is2FAEnabled ? (
+                <div className="tfa-enable-section">
+                  <div className="tfa-info-box">
+                    <Smartphone size={18} />
+                    <div>
+                      <strong>How it works</strong>
+                      <p>
+                        After enabling 2FA, you will need to enter a 6-digit code from your
+                        authenticator app (Google Authenticator, Authy, etc.) every time you sign in.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleEnable}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting
+                      ? <><div className="spinner spinner-sm" /> Setting up...</>
+                      : <><Shield size={16} /> Enable Two-Factor Authentication</>
+                    }
+                  </button>
+                </div>
+              ) : (
+                <div className="tfa-manage-section">
+                  <div className="tfa-info-box tfa-info-success">
+                    <ShieldCheck size={18} />
+                    <div>
+                      <strong>Your account is protected</strong>
+                      <p>
+                        Two-factor authentication is active. You will be prompted for
+                        a verification code on each login.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="tfa-actions-grid">
+                    {/* Regenerate backup codes */}
+                    <div className="tfa-action-card">
+                      <div className="tfa-action-header">
+                        <Key size={16} />
+                        <h3>Regenerate Backup Codes</h3>
+                      </div>
+                      <p className="tfa-action-desc">
+                        Generate new backup codes. Old codes will be invalidated.
+                      </p>
+                      <div className="form-group">
+                        <label className="form-label">Confirm Password</label>
+                        <div className="tfa-password-wrapper">
+                          <input
+                            className="form-input"
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            placeholder="Enter your password"
+                            autoComplete="current-password"
+                            disabled={isSubmitting}
+                          />
+                          <button
+                            type="button"
+                            className="tfa-password-toggle"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleRegenerate}
+                        disabled={isSubmitting || !password}
+                      >
+                        <RefreshCw size={13} /> Regenerate Codes
+                      </button>
+                    </div>
+
+                    {/* Disable 2FA */}
+                    <div className="tfa-action-card tfa-action-danger">
+                      <div className="tfa-action-header">
+                        <ShieldOff size={16} />
+                        <h3>Disable 2FA</h3>
+                      </div>
+                      <p className="tfa-action-desc">
+                        Remove two-factor authentication from your account.
+                        This will make your account less secure.
+                      </p>
+                      <div className="form-group">
+                        <label className="form-label">Confirm Password</label>
+                        <div className="tfa-password-wrapper">
+                          <input
+                            className="form-input"
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            placeholder="Enter your password to confirm"
+                            autoComplete="current-password"
+                            disabled={isSubmitting}
+                          />
+                          <button
+                            type="button"
+                            className="tfa-password-toggle"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={handleDisable}
+                        disabled={isSubmitting || !password}
+                      >
+                        <ShieldOff size={13} /> Disable 2FA
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
-
-              <button 
-                onClick={() => setStep(2)}
-                className="btn-primary"
-              >
-                Next: Verify Code →
-              </button>
-
-              <button 
-                onClick={() => setShowSetup(false)}
-                className="btn-secondary"
-              >
-                Cancel
-              </button>
             </div>
           )}
 
-          {/* Step 2: Verify Code */}
-          {step === 2 && (
-            <div className="setup-step">
-              <h3>Step 2: Verify Code</h3>
-              <p>Enter the 6-digit code from your authenticator app:</p>
-              
-              <form onSubmit={handleVerify2FA}>
-                <input
-                  type="text"
-                  maxLength="6"
-                  placeholder="000000"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                  className="verification-input"
-                  autoFocus
-                  required
-                />
-                <button type="submit" className="btn-primary" disabled={isLoading}>
-                  {isLoading ? '⏳ Verifying...' : 'Verify & Enable'}
-                </button>
-              </form>
-
-              <button 
-                onClick={() => setStep(1)}
-                className="btn-secondary"
-              >
-                ← Back
-              </button>
-            </div>
-          )}
-
-          {/* Step 3: Backup Codes */}
-          {step === 3 && backupCodes.length > 0 && (
-            <div className="setup-step">
-              <h3>⚠️ Save Your Backup Codes</h3>
-              <p className="warning-text">
-                Store these codes in a safe place! Each code can only be used once.
-              </p>
-              
-              <div className="backup-codes-grid">
-                {backupCodes.map((code, index) => (
-                  <div key={index} className="backup-code">
-                    {code}
+          {/* Step: Scan QR */}
+          {step === 'scan' && (
+            <div className="tfa-card-body">
+              <div className="tfa-scan-section">
+                <div className="tfa-step-label">Step 1 — Scan QR Code</div>
+                <p className="tfa-step-desc">
+                  Open your authenticator app (Google Authenticator, Authy, Microsoft Authenticator)
+                  and scan the QR code below.
+                </p>
+                {qrCodeUrl && (
+                  <div className="tfa-qr-container">
+                    <img src={qrCodeUrl} alt="2FA QR Code" className="tfa-qr-image" />
                   </div>
-                ))}
-              </div>
+                )}
 
-              <div className="backup-actions">
-                <button 
-                  onClick={handleDownloadBackupCodes}
-                  className="btn-secondary"
-                >
-                  📥 Download Codes
-                </button>
-                <button 
-                  onClick={handleCompleteSetup}
-                  className="btn-primary"
-                >
-                  ✅ I've Saved My Codes
-                </button>
+                <div className="tfa-step-label" style={{ marginTop: 'var(--space-6)' }}>
+                  Step 2 — Enter Verification Code
+                </div>
+                <p className="tfa-step-desc">
+                  Enter the 6-digit code from your authenticator app.
+                </p>
+                <div className="form-group tfa-code-group">
+                  <input
+                    className="form-input tfa-code-input"
+                    type="text"
+                    value={verifyCode}
+                    onChange={e => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    maxLength={6}
+                    disabled={isSubmitting}
+                    autoComplete="one-time-code"
+                  />
+                </div>
+
+                <div className="tfa-scan-actions">
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleVerify}
+                    disabled={isSubmitting || verifyCode.length !== 6}
+                  >
+                    {isSubmitting
+                      ? <><div className="spinner spinner-sm" /> Verifying...</>
+                      : <><CheckCircle size={16} /> Verify & Enable</>
+                    }
+                  </button>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => { setStep('status'); setVerifyCode(''); setQrCodeUrl(''); }}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           )}
-        </div>
-      )}
 
-      {message && (
-        <p className={`message ${message.startsWith('✅') ? 'success' : 'error'}`}>
-          {message}
-        </p>
-      )}
+          {/* Step: Backup codes */}
+          {step === 'backup' && (
+            <div className="tfa-card-body">
+              <div className="tfa-backup-section">
+                <div className="alert alert-warning" style={{ marginBottom: 'var(--space-5)' }}>
+                  <AlertCircle size={15} />
+                  <div>
+                    <strong>Save these codes securely</strong>
+                    <p style={{ margin: 0, marginTop: 'var(--space-1)' }}>
+                      These backup codes can be used to access your account if you lose your
+                      authenticator device. Each code can only be used once.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="tfa-backup-codes">
+                  {backupCodes.map((code, i) => (
+                    <div key={i} className="tfa-backup-code">
+                      <span className="tfa-backup-code-num">{String(i + 1).padStart(2, '0')}</span>
+                      <code className="tfa-backup-code-value">{code}</code>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="tfa-backup-actions">
+                  <button className="btn btn-secondary" onClick={handleCopyBackupCodes}>
+                    <Copy size={15} /> Copy All Codes
+                  </button>
+                  <button className="btn btn-primary" onClick={() => setStep('status')}>
+                    <CheckCircle size={15} /> Done
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
     </div>
   );
 }
