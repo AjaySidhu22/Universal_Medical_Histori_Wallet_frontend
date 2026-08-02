@@ -1,395 +1,354 @@
 // frontend/src/components/AdminDashboard.js
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Users, Stethoscope, UserCheck, Clock, Shield,
+  Trash2, CheckCircle, XCircle, AlertCircle,
+  RefreshCw, ChevronDown, Building, BadgeCheck,
+  Calendar, Search, X
+} from 'lucide-react';
 import umhwApi from '../api/umhwApi';
 import './AdminDashboard.css';
+
+const ROLES = ['patient', 'doctor', 'admin'];
 
 function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [doctorsLoading, setDoctorsLoading] = useState(true);
   const [error, setError] = useState('');
-  const [doctorError, setDoctorError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const [loggedInUserEmail, setLoggedInUserEmail] = useState(''); // NEW LINE
+  const [searchTerm, setSearchTerm] = useState('');
+  const loggedInUserEmail = sessionStorage.getItem('userEmail');
 
-   // Fetch all users
-const fetchUsers = async () => {
-  try {
-    setLoading(true);
-    
-    // Get current user's email
-    const profileRes = await umhwApi.get('/profile/profile');
-    setLoggedInUserEmail(profileRes.data.user.email);
-    
-    const res = await umhwApi.get('/admin/users');
-    setUsers(res.data);
-    setError('');
-  } catch (err) {
-    setError('Failed to fetch users');
-    console.error(err);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  // Fetch unverified doctors
-  const fetchUnverifiedDoctors = async () => {
-    try {
-      setDoctorsLoading(true);
-      setDoctorError('');
-      const res = await umhwApi.get('/admin/doctors/unverified');
-      setDoctors(res.data);
-    } catch (err) {
-      setDoctorError('Failed to fetch doctors');
-      console.error(err);
-    } finally {
-      setDoctorsLoading(false);
-    }
+  const showSuccess = (msg) => {
+    setSuccessMessage(msg);
+    setTimeout(() => setSuccessMessage(''), 4000);
   };
 
-  useEffect(() => {
-    fetchUsers();
-    fetchUnverifiedDoctors();
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await umhwApi.get('/admin/users');
+      setUsers(res.data.users || res.data || []);
+    } catch {
+      setError('Failed to load users.');
+    }
   }, []);
 
-  // Delete user
-  const deleteUser = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
+  const fetchUnverifiedDoctors = useCallback(async () => {
     try {
-      await umhwApi.delete(`/admin/users/${id}`);
-      setUsers(users.filter((u) => u.id !== id));
-      setSuccessMessage('✅ User deleted successfully');
-      setTimeout(() => setSuccessMessage(''), 3000);
-    } catch (err) {
-      setError('Failed to delete user');
+      const res = await umhwApi.get('/admin/doctors/unverified');
+      setDoctors(res.data.doctors || res.data || []);
+    } catch {
+      setError('Failed to load unverified doctors.');
     }
-  };
+  }, []);
 
-  // Update role
-  const updateRole = async (id, role) => {
-    try {
-      setUsers(prev =>
-        prev.map(u => (u.id === id ? { ...u, updating: true } : u))
-      );
+  useEffect(() => {
+    const init = async () => {
+      await Promise.all([fetchUsers(), fetchUnverifiedDoctors()]);
+      setLoading(false);
+    };
+    init();
+  }, [fetchUsers, fetchUnverifiedDoctors]);
 
-      await umhwApi.put(`/admin/users/${id}/role`, { role });
-
-      setUsers(prev =>
-        prev.map(u => (u.id === id ? { ...u, role, updating: false } : u))
-      );
-
-      setSuccessMessage('✅ Role updated successfully');
-      setTimeout(() => setSuccessMessage(''), 3000);
-
-      const current = await umhwApi.get('/profile/profile');
-      if (current.data.user.id === id && role !== 'admin') {
-        alert('You changed your own role – you will be logged out.');
-        await umhwApi.post('/auth/logout');
-        sessionStorage.removeItem('accessToken');
-        window.location.href = '/';
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update role');
-      console.error(err);
-      setUsers(prev =>
-        prev.map(u => (u.id === id ? { ...u, updating: false } : u))
-      );
-    }
-  };
-
-  // Verify doctor
   const verifyDoctor = async (doctorId) => {
-    if (!window.confirm('Verify this doctor? They will be able to create medical records.')) return;
-
     try {
-      setDoctors(prev =>
-        prev.map(d => (d.id === doctorId ? { ...d, updating: true } : d))
-      );
-
       await umhwApi.put(`/admin/doctors/${doctorId}/verify`, { isVerified: true });
-
       setDoctors(prev => prev.filter(d => d.id !== doctorId));
-
-      setSuccessMessage('✅ Doctor verified successfully!');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      showSuccess('Doctor verified successfully.');
       fetchUsers();
     } catch (err) {
-      setError('Failed to verify doctor: ' + (err.response?.data?.message || err.message));
-      setDoctors(prev =>
-        prev.map(d => (d.id === doctorId ? { ...d, updating: false } : d))
-      );
+      setError(err.response?.data?.message || 'Failed to verify doctor.');
     }
   };
-  
-  // Unverify doctor
+
   const unverifyDoctor = async (userId, doctorProfileId) => {
     if (!window.confirm('Revoke this doctor\'s verification? They will lose access to create medical records.')) return;
     try {
       await umhwApi.put(`/admin/doctors/${doctorProfileId}/verify`, { isVerified: false });
-      setSuccessMessage('✅ Doctor verification revoked');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      showSuccess('Doctor verification revoked.');
       fetchUsers();
       fetchUnverifiedDoctors();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to revoke verification');
+      setError(err.response?.data?.message || 'Failed to revoke verification.');
     }
   };
 
-  if (loading && doctorsLoading) {
+  const deleteUser = async (id) => {
+    if (!window.confirm('Delete this user permanently? All their data will be removed.')) return;
+    try {
+      await umhwApi.delete(`/admin/users/${id}`);
+      setUsers(prev => prev.filter(u => u.id !== id));
+      showSuccess('User deleted successfully.');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to delete user.');
+    }
+  };
+
+  const updateRole = async (id, newRole) => {
+    try {
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, updating: true } : u));
+      await umhwApi.put(`/admin/users/${id}/role`, { role: newRole });
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, role: newRole, updating: false } : u));
+      showSuccess(`Role updated to ${newRole}.`);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update role.');
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, updating: false } : u));
+    }
+  };
+
+  const filteredUsers = users.filter(u =>
+    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.role?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const stats = {
+    total: users.length,
+    doctors: users.filter(u => u.role === 'doctor').length,
+    patients: users.filter(u => u.role === 'patient').length,
+    pending: doctors.length,
+  };
+
+  if (loading) {
     return (
-      <div className="loading-state">
-        <div className="spinner"></div>
+      <div className="page-content page-loading">
+        <div className="spinner spinner-lg" />
         <p>Loading admin dashboard...</p>
       </div>
     );
   }
 
   return (
-    <div className="admin-dashboard">
-      {/* Header */}
-      <div className="admin-header">
-        <h2>
-          <span>👑</span>
-          Admin Dashboard
-        </h2>
-        <p className="admin-subtitle">Manage users and verify doctors</p>
-      </div>
+    <div className="page-content">
+      <div className="container">
 
-      {/* Success Message */}
-      {successMessage && (
-        <div className="alert alert-success">
-          {successMessage}
-        </div>
-      )}
-
-      {/* Error Message */}
-      {error && (
-        <div className="alert alert-danger">
-          {error}
-        </div>
-      )}
-
-      {/* Stats Overview */}
-      <div className="admin-stats">
-        <div className="stat-card">
-          <div className="stat-icon">👥</div>
-          <div className="stat-content">
-            <h3>{users.length}</h3>
-            <p>Total Users</p>
+        {/* Page header */}
+        <div className="admin-header">
+          <div>
+            <h1 className="dash-title">Admin Dashboard</h1>
+            <p className="dash-subtitle">Manage users and verify doctors.</p>
           </div>
+          <span className="badge badge-primary">
+            <Shield size={11} /> Admin
+          </span>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-icon">👨‍⚕️</div>
-          <div className="stat-content">
-            <h3>{users.filter(u => u.role === 'doctor').length}</h3>
-            <p>Doctors</p>
+        {/* Messages */}
+        {error && (
+          <div className="alert alert-danger" style={{ marginBottom: 'var(--space-5)' }}>
+            <AlertCircle size={15} /> {error}
+            <button className="btn btn-ghost btn-sm" onClick={() => setError('')} style={{ marginLeft: 'auto' }}>
+              <X size={14} />
+            </button>
           </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon">🏥</div>
-          <div className="stat-content">
-            <h3>{users.filter(u => u.role === 'patient').length}</h3>
-            <p>Patients</p>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon">⏳</div>
-          <div className="stat-content">
-            <h3>{doctors.length}</h3>
-            <p>Pending Verifications</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Pending Doctor Verifications */}
-      <div className="admin-section">
-        <div className="section-header">
-          <h3>
-            <span className="section-icon">🔔</span>
-            Pending Doctor Verifications
-          </h3>
-          <button className="refresh-button" onClick={fetchUnverifiedDoctors}>
-            <span>🔄</span>
-          </button>
-        </div>
-
-        {doctorError && (
-          <div className="alert alert-danger">
-            {doctorError}
+        )}
+        {successMessage && (
+          <div className="alert alert-success" style={{ marginBottom: 'var(--space-5)' }}>
+            <CheckCircle size={15} /> {successMessage}
           </div>
         )}
 
-        {doctorsLoading ? (
-          <div className="loading-state">
-            <div className="spinner"></div>
-            <p>Loading doctors...</p>
+        {/* Stats */}
+        <div className="admin-stats">
+          <div className="stat-card">
+            <div className="stat-icon"><Users size={20} /></div>
+            <div>
+              <div className="stat-value">{stats.total}</div>
+              <div className="stat-label">Total Users</div>
+            </div>
           </div>
-        ) : doctors.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-icon">✅</div>
-            <p>No pending verifications - all doctors are verified!</p>
+          <div className="stat-card">
+            <div className="stat-icon" style={{ background: 'var(--color-success-light)', color: 'var(--color-success)' }}>
+              <Stethoscope size={20} />
+            </div>
+            <div>
+              <div className="stat-value">{stats.doctors}</div>
+              <div className="stat-label">Doctors</div>
+            </div>
           </div>
-        ) : (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Doctor Information</th>
-                <th>Specialty</th>
-                <th>License Number</th>
-                <th>Registered</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {doctors.map((doc) => (
-                <tr key={doc.id}>
-                  <td data-label="Doctor Information">
-                    <div className="doctor-info">
-                      <span className="doctor-name">
-                        👨‍⚕️ {doc.name || doc.User?.email || 'N/A'}
-                      </span>
-                      <span className="user-email">{doc.User?.email}</span>
+          <div className="stat-card">
+            <div className="stat-icon" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
+              <Users size={20} />
+            </div>
+            <div>
+              <div className="stat-value">{stats.patients}</div>
+              <div className="stat-label">Patients</div>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon" style={{ background: 'var(--color-warning-light)', color: 'var(--color-warning)' }}>
+              <Clock size={20} />
+            </div>
+            <div>
+              <div className="stat-value">{stats.pending}</div>
+              <div className="stat-label">Pending Verifications</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Pending Doctor Verifications */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <div className="admin-card-title">
+              <Clock size={18} />
+              Pending Doctor Verifications
+              {doctors.length > 0 && (
+                <span className="badge badge-warning" style={{ marginLeft: 'var(--space-2)' }}>
+                  {doctors.length}
+                </span>
+              )}
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={fetchUnverifiedDoctors}>
+              <RefreshCw size={14} />
+            </button>
+          </div>
+
+          {doctors.length === 0 ? (
+            <div className="admin-empty">
+              <CheckCircle size={32} style={{ color: 'var(--color-success)' }} />
+              <p>All doctors are verified.</p>
+            </div>
+          ) : (
+            <div className="admin-doctors-list">
+              {doctors.map(doctor => (
+                <div key={doctor.id} className="admin-doctor-card">
+                  <div className="admin-doctor-info">
+                    <div className="admin-doctor-avatar">
+                      <Stethoscope size={18} />
                     </div>
-                  </td>
-                  <td data-label="Specialty">
-                    <span className="doctor-specialty">
-                      {doc.specialty || 'Not specified'}
-                    </span>
-                  </td>
-                  <td data-label="License Number">
-                    <span className="doctor-license">
-                      {doc.licenseNumber || 'Not specified'}
-                    </span>
-                  </td>
-                  <td data-label="Registered">
-                    {new Date(doc.createdAt).toLocaleDateString()}
-                  </td>
-                  <td data-label="Actions">
-                    <button
-                      onClick={() => verifyDoctor(doc.id)}
-                      disabled={doc.updating}
-                      className="btn-verify"
-                    >
-                      {doc.updating ? (
-                        <>
-                          <span className="spinner spinner-sm"></span>
-                          <span>Verifying...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>✓</span>
-                          <span>Verify</span>
-                        </>
-                      )}
-                    </button>
-                  </td>
-                </tr>
+                    <div>
+                      <div className="admin-doctor-name">
+                        {doctor.name?.startsWith('Dr.') ? doctor.name : `Dr. ${doctor.name}`}
+                      </div>
+                      <div className="admin-doctor-email">{doctor.User?.email}</div>
+                      <div className="admin-doctor-meta">
+                        <span><BadgeCheck size={12} /> {doctor.specialty}</span>
+                        <span><Building size={12} /> {doctor.hospitalAffiliation}</span>
+                        <span><Calendar size={12} /> {new Date(doctor.createdAt).toLocaleDateString('en-IN')}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => verifyDoctor(doctor.id)}
+                  >
+                    <CheckCircle size={13} /> Verify
+                  </button>
+                </div>
               ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* User Management */}
-      <div className="admin-section">
-        <div className="section-header">
-          <h3>
-            <span className="section-icon">👥</span>
-            All Users Management
-          </h3>
-          <button className="refresh-button" onClick={fetchUsers}>
-            <span>🔄</span>
-          </button>
+            </div>
+          )}
         </div>
 
-        {loading ? (
-          <div className="loading-state">
-            <div className="spinner"></div>
-            <p>Loading users...</p>
+        {/* All Users */}
+        <div className="admin-card">
+          <div className="admin-card-header">
+            <div className="admin-card-title">
+              <Users size={18} />
+              All Users
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+              <div className="admin-search">
+                <Search size={14} className="admin-search-icon" />
+                <input
+                  className="admin-search-input"
+                  type="text"
+                  placeholder="Search users..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={fetchUsers}>
+                <RefreshCw size={14} />
+              </button>
+            </div>
           </div>
-        ) : (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>User Information</th>
-                <th>Role</th>
-                <th>Email Verified</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <td data-label="User Information">
-                    <div className="user-info">
-                      <span className="user-email">{u.email}</span>
-                      <span className="user-id">ID: {u.id.substring(0, 8)}...</span>
+
+          <div className="admin-users-list">
+            {filteredUsers.length === 0 ? (
+              <div className="admin-empty">
+                <Users size={32} style={{ color: 'var(--color-border)' }} />
+                <p>No users found.</p>
+              </div>
+            ) : (
+              filteredUsers.map(user => (
+                <div key={user.id} className="admin-user-row">
+                  <div className="admin-user-info">
+                    <div className="admin-user-avatar">
+                      {user.role === 'admin' ? <Shield size={14} />
+                        : user.role === 'doctor' ? <Stethoscope size={14} />
+                        : <Users size={14} />}
                     </div>
-                  </td>
-                  <td data-label="Role">
-                    <select
-                      value={u.role}
-                      disabled={u.updating}
-                      onChange={(e) => updateRole(u.id, e.target.value)}
-                      className="role-select"
-                    >
-                      <option value="patient">Patient</option>
-                      <option value="doctor">Doctor</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </td>
-                  <td data-label="Email Verified">
-                    {u.isEmailVerified ? (
-                      <span className="status-badge status-verified">
-                        ✓ Verified
-                      </span>
-                    ) : (
-                      <span className="status-badge status-pending">
-                        ⏳ Pending
+                    <div>
+                      <div className="admin-user-email">{user.email}</div>
+                      <div className="admin-user-id">
+                        ID: {user.id?.substring(0, 8)}...
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="admin-user-controls">
+                    {/* Role selector */}
+                    <div className="admin-role-select-wrapper">
+                      <select
+                        className="admin-role-select"
+                        value={user.role}
+                        onChange={e => updateRole(user.id, e.target.value)}
+                        disabled={user.updating || user.email === loggedInUserEmail}
+                      >
+                        {ROLES.map(r => (
+                          <option key={r} value={r}>
+                            {r.charAt(0).toUpperCase() + r.slice(1)}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={12} className="admin-role-chevron" />
+                    </div>
+
+                    {/* Verified badge */}
+                    {user.isEmailVerified && (
+                      <span className="badge badge-success">
+                        <CheckCircle size={10} /> Verified
                       </span>
                     )}
-                  </td>
-                  <td data-label="Created">
-                    {new Date(u.createdAt).toLocaleDateString()}
-                  </td>
-                  <td data-label="Actions">
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {u.role === 'doctor' && u.DoctorProfile?.isVerified && (
-                        <button
-                          onClick={() => unverifyDoctor(u.id, u.DoctorProfile.id)}
-                          className="btn-delete"
-                          style={{ background: '#f59e0b' }}
-                        >
-                          <span>✕</span>
-                          <span>Revoke</span>
-                        </button>
-                      )}
+
+                    {/* Join date */}
+                    <span className="admin-user-date">
+                      {new Date(user.createdAt).toLocaleDateString('en-IN')}
+                    </span>
+
+                    {/* Unverify doctor button */}
+                    {user.role === 'doctor' && user.DoctorProfile?.isVerified && (
                       <button
-                        onClick={() => deleteUser(u.id)}
-                        className="btn-delete"
-                        disabled={u.role === 'admin' && u.email === loggedInUserEmail}
-                        title={u.role === 'admin' && u.email === loggedInUserEmail ? "Cannot delete your own admin account" : "Delete user"}
-                        style={{
-                          opacity: u.role === 'admin' && u.email === loggedInUserEmail ? 0.5 : 1,
-                          cursor: u.role === 'admin' && u.email === loggedInUserEmail ? 'not-allowed' : 'pointer'
-                        }}
+                        className="btn btn-sm"
+                        style={{ background: 'var(--color-warning-light)', color: 'var(--color-warning)', border: '1px solid var(--color-warning)' }}
+                        onClick={() => unverifyDoctor(user.id, user.DoctorProfile.id)}
                       >
-                        <span>🗑️</span>
-                        <span>Delete</span>
+                        <XCircle size={13} /> Revoke
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+                    )}
+
+                    {/* Delete button */}
+                    <button
+                      className="btn btn-danger btn-sm"
+                      onClick={() => deleteUser(user.id)}
+                      disabled={user.email === loggedInUserEmail}
+                      title={user.email === loggedInUserEmail ? 'Cannot delete your own account' : 'Delete user'}
+                      style={{
+                        opacity: user.email === loggedInUserEmail ? 0.4 : 1,
+                        cursor: user.email === loggedInUserEmail ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
       </div>
     </div>
   );
