@@ -1,440 +1,368 @@
 // frontend/src/components/DoctorPatientSearch.js
-import MedicalRecordForm from './MedicalRecordForm';
-import React, { useState } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Search, Send, Clock, ChevronDown, User, Activity,
+  MessageSquare, CheckCircle, AlertCircle, X,
+  RefreshCw, Eye, Edit2, FileText, Timer
+} from 'lucide-react';
 import umhwApi from '../api/umhwApi';
+import MedicalRecordForm from './MedicalRecordForm';
 import './DoctorPatientSearch.css';
+
+const ACCESS_TYPES = [
+  { value: 'view',   label: 'View Only' },
+  { value: 'create', label: 'Create Records Only' },
+  { value: 'both',   label: 'View & Create (Recommended)' },
+];
+
+const DURATION_OPTIONS = [
+  { value: 0.5,  label: '30 Minutes' },
+  { value: 1,    label: '1 Hour' },
+  { value: 24,   label: '24 Hours (1 Day)' },
+  { value: 48,   label: '48 Hours (2 Days) — Default' },
+  { value: 72,   label: '72 Hours (3 Days)' },
+  { value: 168,  label: '1 Week' },
+  { value: 336,  label: '2 Weeks' },
+  { value: 720,  label: '30 Days (Maximum)' },
+];
+
+const formatDate = (dateStr) =>
+  new Date(dateStr).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric'
+  });
+
+const isExpired = (expiresAt) => new Date() > new Date(expiresAt);
+
+const getStatusInfo = (status, expiresAt) => {
+  if (isExpired(expiresAt) && (status === 'approved' || status === 'pending')) {
+    return { label: 'Expired', className: 'status-expired' };
+  }
+  switch (status) {
+    case 'approved': return { label: 'Approved', className: 'status-approved' };
+    case 'denied':   return { label: 'Denied',   className: 'status-denied'   };
+    default:         return { label: 'Pending',  className: 'status-pending'  };
+  }
+};
 
 function DoctorPatientSearch() {
   const [patientIdentifier, setPatientIdentifier] = useState('');
   const [requestType, setRequestType] = useState('both');
+  const [durationHours, setDurationHours] = useState(48);
   const [reason, setReason] = useState('');
-  const [requestDuration, setRequestDuration] = useState(48);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('success');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [myRequests, setMyRequests] = useState([]);
-  const [showMyRequests, setShowMyRequests] = useState(false);
+  const [showRequests, setShowRequests] = useState(false);
+  const [loadingRequests, setLoadingRequests] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedPatientId, setSelectedPatientId] = useState(null);
-  const [loading, setLoading] = useState(false);
- 
-  const handleRequestAccess = async (e) => {
-    e.preventDefault();
-    setMessage('');
 
+  const setSuccess = (msg) => { setMessage(msg); setMessageType('success'); };
+  const setError = (msg) => { setMessage(msg); setMessageType('error'); };
+
+  const fetchMyRequests = useCallback(async () => {
+    setLoadingRequests(true);
+    try {
+      const res = await umhwApi.get('/access-requests/my-requests?page=1&limit=50');
+      setMyRequests(res.data.data || []);
+    } catch {
+      setError('Failed to load access requests.');
+    } finally {
+      setLoadingRequests(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMyRequests();
+  }, [fetchMyRequests]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     if (!patientIdentifier.trim()) {
-      setMessage('❌ Please enter a patient username or email');
+      setError('Please enter a patient username or email.');
       return;
     }
-
-    setLoading(true);
-
+    setIsSubmitting(true);
+    setMessage('');
     try {
-      const res = await umhwApi.post('/access-requests', {
+      await umhwApi.post('/access-requests', {
         patientIdentifier: patientIdentifier.trim(),
         requestType,
-        reason: reason.trim() || 'Medical consultation',
-        durationHours: requestDuration
+        reason,
+        durationHours: Number(durationHours)
       });
-
-      setMessage(`✅ ${res.data.message}`);
+      setSuccess('Access request sent. The patient has been notified via email.');
       setPatientIdentifier('');
       setReason('');
-      setRequestDuration(48);
-
-      if (showMyRequests) {
-        fetchMyRequests();
-      }
+      await fetchMyRequests();
+      setShowRequests(true);
     } catch (err) {
-      setMessage(`❌ ${err.response?.data?.message || 'Failed to send access request'}`);
+      setError(err.response?.data?.message || 'Failed to send access request.');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
-
-  const fetchMyRequests = async () => {
-  setLoading(true);
-  try {
-    const res = await umhwApi.get('/access-requests/my-requests?page=1&limit=50'); // Get 50 for modal
-    setMyRequests(res.data.data || []); // ✅ CHANGED: Use res.data.data
-    setShowMyRequests(true);
-  } catch (err) {
-    setMessage('❌ Failed to load your requests');
-    setMyRequests([]); // ✅ Set empty array on error
-  } finally {
-    setLoading(false);
-  }
-}; 
 
   const handleCancelRequest = async (requestId) => {
-    if (!window.confirm('Cancel this access request?')) return;
-
     try {
       await umhwApi.delete(`/access-requests/${requestId}`);
-      setMessage('✅ Request cancelled');
-      fetchMyRequests();
+      setSuccess('Request cancelled.');
+      await fetchMyRequests();
     } catch (err) {
-      setMessage('❌ Failed to cancel request');
+      setError(err.response?.data?.message || 'Failed to cancel request.');
     }
   };
 
-  const getStatusBadge = (status, expiresAt) => {
-    const isExpired = new Date() > new Date(expiresAt);
-
-    if (isExpired && status === 'pending') {
-      return <span className="status-badge status-rejected">⏱️ EXPIRED</span>;
-    }
-
-    const statusMap = {
-      pending: <span className="status-badge status-pending">⏳ PENDING</span>,
-      approved: <span className="status-badge status-approved">✅ APPROVED</span>,
-      denied: <span className="status-badge status-rejected">❌ DENIED</span>
-    };
-
-    return statusMap[status] || null;
-  };
-
-  const getDurationLabel = (hours) => {
-    if (hours === 0.5) return '30 Minutes';
-    if (hours === 1) return '1 Hour';
-    if (hours === 24) return '24 Hours (1 Day)';
-    if (hours === 48) return '48 Hours (2 Days)';
-    if (hours === 72) return '72 Hours (3 Days)';
-    if (hours === 168) return '1 Week';
-    if (hours === 336) return '2 Weeks';
-    if (hours === 720) return '30 Days';
-    return `${hours} Hours`;
-  };
+  const approvedActive = myRequests.filter(
+    r => r.status === 'approved' && !isExpired(r.expiresAt)
+  );
 
   return (
-    <div className="doctor-search-container">
-      <div className="search-header">
-        <h3>
-          <span>🔍</span>
-          Request Patient Access
-        </h3>
-        <p className="search-subtitle">
-          Search for patients and request access to their medical records
-        </p>
-      </div>
+    <div className="dps-wrapper">
 
-      {message && (
-        <div className={`message ${message.includes('✅') ? 'success' : 'error'}`}>
-          {message}
-        </div>
-      )}
-
-      <form onSubmit={handleRequestAccess} className="request-form">
-        <div className="form-group full-width">
-          <label>
-            <span>🔍</span>
-            Patient Username or Email
-            <span style={{ color: 'var(--danger-color)' }}>*</span>
-          </label>
-          <input
-            type="text"
-            value={patientIdentifier}
-            onChange={(e) => setPatientIdentifier(e.target.value)}
-            placeholder="e.g., @john_smith or patient@email.com"
-            required
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '12px 16px',
-              borderRadius: 'var(--border-radius)',
-              border: '2px solid var(--gray-300)',
-              fontSize: 'var(--font-size-base)'
-            }}
-          />
-          <p className="helper-text info">
-            💡 Search by username (e.g., @john_smith) or email address
-          </p>
+      {/* Access Request Form */}
+      <div className="dps-card">
+        <div className="dps-card-header">
+          <Search size={18} />
+          <h3>Request Patient Access</h3>
         </div>
 
-        <div className="form-row">
+        <form onSubmit={handleSubmit} className="dps-form">
+          {message && (
+            <div className={`alert ${messageType === 'success' ? 'alert-success' : 'alert-danger'}`}>
+              {messageType === 'success' ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
+              {message}
+            </div>
+          )}
+
           <div className="form-group">
-            <label>
-              <span>📋</span>
-              Access Type
+            <label className="form-label" htmlFor="patient-id">
+              Patient Username or Email *
             </label>
-            <select
-              value={requestType}
-              onChange={(e) => setRequestType(e.target.value)}
-              disabled={loading}
-            >
-              <option value="view">View Only</option>
-              <option value="create">Create Records Only</option>
-              <option value="both">View & Create (Recommended)</option>
-            </select>
+            <div className="dps-input-wrapper">
+              <User size={15} className="dps-input-icon" />
+              <input
+                id="patient-id"
+                className="form-input dps-input"
+                type="text"
+                value={patientIdentifier}
+                onChange={e => setPatientIdentifier(e.target.value)}
+                placeholder="e.g., @john_smith or patient@email.com"
+                disabled={isSubmitting}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+
+          <div className="dps-form-row">
+            <div className="form-group">
+              <label className="form-label" htmlFor="access-type">
+                <Activity size={13} /> Access Type
+              </label>
+              <select
+                id="access-type"
+                className="form-select"
+                value={requestType}
+                onChange={e => setRequestType(e.target.value)}
+                disabled={isSubmitting}
+              >
+                {ACCESS_TYPES.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="duration">
+                <Clock size={13} /> Access Duration
+              </label>
+              <select
+                id="duration"
+                className="form-select"
+                value={durationHours}
+                onChange={e => setDurationHours(e.target.value)}
+                disabled={isSubmitting}
+              >
+                {DURATION_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div className="form-group">
-            <label>
-              <span>⏰</span>
-              Access Duration
+            <label className="form-label" htmlFor="reason">
+              <MessageSquare size={13} /> Reason for Access
             </label>
-            <select
-              value={requestDuration}
-              onChange={(e) => setRequestDuration(Number(e.target.value))}
-              disabled={loading}
-            >
-              <option value={0.5}>30 Minutes</option>
-              <option value={1}>1 Hour</option>
-              <option value={24}>24 Hours (1 Day)</option>
-              <option value={48}>48 Hours (2 Days) - Default</option>
-              <option value={72}>72 Hours (3 Days)</option>
-              <option value={168}>1 Week</option>
-              <option value={336}>2 Weeks</option>
-              <option value={720}>30 Days (Maximum)</option>
-            </select>
+            <textarea
+              id="reason"
+              className="form-textarea"
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="e.g., Routine consultation, Follow-up treatment..."
+              maxLength={500}
+              rows={3}
+              disabled={isSubmitting}
+            />
+            <p className="form-helper">{reason.length}/500 characters</p>
           </div>
-        </div>
 
-        <div className="form-group full-width">
-          <label>
-            <span>💬</span>
-            Reason for Access
-          </label>
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="e.g., Routine consultation, Follow-up treatment..."
-            maxLength={500}
-            disabled={loading}
-          />
-          <p className="helper-text">
-            {reason.length}/500 characters
-          </p>
-        </div>
-
-        <button
-          type="submit"
-          className="btn-submit"
-          disabled={loading}
-        >
-          {loading ? (
-            <>
-              <span className="spinner spinner-sm"></span>
-              <span>Sending...</span>
-            </>
-          ) : (
-            <>
-              <span>📤</span>
-              <span>Send Access Request</span>
-            </>
-          )}
-        </button>
-      </form>
-
-      {/* View My Requests Button */}
-      <div style={{ textAlign: 'center', margin: 'var(--spacing-2xl) 0' }}>
-        <button
-          onClick={fetchMyRequests}
-          className="search-button"
-          disabled={loading}
-        >
-          {loading ? (
-            <>
-              <span className="spinner spinner-sm"></span>
-              <span>Loading...</span>
-            </>
-          ) : (
-            <>
-              <span>📋</span>
-              <span>View My Requests</span>
-            </>
-          )}
-        </button>
+          <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+            {isSubmitting
+              ? <><div className="spinner spinner-sm" /> Sending...</>
+              : <><Send size={15} /> Send Access Request</>
+            }
+          </button>
+        </form>
       </div>
 
-      {/* ✅ NEW: Requests Modal */}
-      {showMyRequests && (
-        <div className="modal-overlay" onClick={() => {
-          setShowMyRequests(false);
-          setShowCreateForm(false);
-          setSelectedPatientId(null);
-        }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '1000px' }}>
-            <div className="modal-header">
-              <h3>
-                <span>📋</span> My Access Requests ({myRequests.length})
-              </h3>
-              <button 
-                className="modal-close"
-                onClick={() => {
-                  setShowMyRequests(false);
-                  setShowCreateForm(false);
-                  setSelectedPatientId(null);
-                }}
-              >
-                ✕
-              </button>
-            </div>
+      {/* My Requests */}
+      <div className="dps-card">
+        <div className="dps-card-header dps-requests-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <FileText size={18} />
+            <h3>
+              My Access Requests
+              {myRequests.length > 0 && (
+                <span className="badge badge-primary" style={{ marginLeft: 'var(--space-2)' }}>
+                  {myRequests.length}
+                </span>
+              )}
+            </h3>
+          </div>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => { setShowRequests(!showRequests); fetchMyRequests(); }}
+          >
+            <RefreshCw size={14} />
+            {showRequests ? 'Hide' : 'Show'}
+          </button>
+        </div>
 
-            <div style={{ marginBottom: 'var(--spacing-lg)' }}>
-              <button
-                onClick={fetchMyRequests}
-                className="search-button"
-                disabled={loading}
-                style={{ width: '100%' }}
-              >
-                {loading ? (
-                  <>
-                    <span className="spinner spinner-sm"></span>
-                    <span>Refreshing...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🔄</span>
-                    <span>Refresh Requests</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {myRequests.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">📋</div>
-                <p>No requests sent yet</p>
+        {showRequests && (
+          <div className="dps-requests-body">
+            {loadingRequests ? (
+              <div className="dps-loading">
+                <div className="spinner spinner-sm" /> Loading...
+              </div>
+            ) : myRequests.length === 0 ? (
+              <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
+                <FileText size={32} className="empty-state-icon" />
+                <p>No access requests sent yet.</p>
               </div>
             ) : (
-              <>
-                <div className="patient-list">
-                  {myRequests.map(req => {
-                    const isExpired = new Date() > new Date(req.expiresAt);
+              <div className="dps-requests-list">
+                {myRequests.map(request => {
+                  const statusInfo = getStatusInfo(request.status, request.expiresAt);
+                  const canCancel = request.status === 'pending' && !isExpired(request.expiresAt);
+                  const canCreate = request.status === 'approved' &&
+                    !isExpired(request.expiresAt) &&
+                    ['create', 'both'].includes(request.requestType);
 
-                    return (
-                      <div key={req.id} className="patient-card">
-                        <div className="patient-header">
-                          <div className="patient-info">
-                            <div className="patient-email">
-                              👤 {req.PatientProfile?.User?.email}
-                            </div>
-                            <div className="patient-id">
-                              @{req.PatientProfile?.User?.username || 'No username'}
-                            </div>
-                          </div>
-                          {getStatusBadge(req.status, req.expiresAt)}
+                  return (
+                    <div key={request.id} className={`dps-request-item ${statusInfo.className}`}>
+                      <div className="dps-request-info">
+                        <div className="dps-request-patient">
+                          <User size={14} />
+                          <span>{request.PatientProfile?.User?.email || 'Patient'}</span>
+                          <span className="dps-request-username">
+                            @{request.PatientProfile?.User?.username}
+                          </span>
                         </div>
-
-                        <div className="patient-meta">
-                          <div className="meta-item">
-                            <span className="meta-icon">📋</span>
-                            <span>Type: {req.requestType}</span>
-                          </div>
-                          <div className="meta-item">
-                            <span className="meta-icon">⏰</span>
-                            <span>Duration: {getDurationLabel(req.requestedDuration)}</span>
-                          </div>
-                          <div className="meta-item">
-                            <span className="meta-icon">📅</span>
-                            <span>Sent: {new Date(req.createdAt).toLocaleDateString()}</span>
-                          </div>
-                          <div className="meta-item">
-                            <span className="meta-icon">⏳</span>
-                            <span>Expires: {new Date(req.expiresAt).toLocaleDateString()}</span>
-                          </div>
+                        <div className="dps-request-meta">
+                          <span className={`badge ${
+                            statusInfo.className === 'status-approved' ? 'badge-success' :
+                            statusInfo.className === 'status-denied'   ? 'badge-danger'  :
+                            statusInfo.className === 'status-expired'  ? 'badge-muted'   :
+                            'badge-warning'
+                          }`}>
+                            {statusInfo.label}
+                          </span>
+                          <span className="dps-meta-item">
+                            <Activity size={12} />
+                            {request.requestType === 'both' ? 'View & Create'
+                              : request.requestType === 'view' ? 'View Only'
+                              : 'Create Only'}
+                          </span>
+                          <span className="dps-meta-item">
+                            <Timer size={12} />
+                            {request.requestedDuration < 24
+                              ? `${request.requestedDuration}h`
+                              : `${request.requestedDuration / 24}d`}
+                          </span>
+                          <span className="dps-meta-item">
+                            <Clock size={12} />
+                            Sent: {formatDate(request.createdAt)}
+                          </span>
                         </div>
+                      </div>
 
-                        {req.approvedDuration && req.status === 'approved' && (
-                          <div className="alert alert-success" style={{ marginTop: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)' }}>
-                            ✅ Approved for: {getDurationLabel(req.approvedDuration)}
-                          </div>
-                        )}
-
-                        {req.status === 'pending' && !isExpired && (
+                      <div className="dps-request-actions">
+                        {canCreate && (
                           <button
-                            onClick={() => handleCancelRequest(req.id)}
-                            className="btn-cancel"
-                            style={{ marginTop: 'var(--spacing-md)' }}
+                            className="btn btn-primary btn-sm"
+                            onClick={() => {
+                              setSelectedPatientId(request.PatientProfile?.id);
+                              setShowCreateForm(true);
+                            }}
                           >
-                            <span>❌</span>
-                            <span>Cancel Request</span>
+                            <Edit2 size={13} /> Create Record
                           </button>
                         )}
+                        {canCancel && (
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleCancelRequest(request.id)}
+                          >
+                            <X size={13} /> Cancel
+                          </button>
+                        )}
+                        {request.status === 'approved' && !isExpired(request.expiresAt) && (
+                          <span className="dps-expires-text">
+                            <Timer size={11} />
+                            Expires: {formatDate(request.expiresAt)}
+                          </span>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
-
-                {myRequests.some(req =>
-                  req.status === 'approved' &&
-                  new Date(req.expiresAt) > new Date() &&
-                  ['create', 'both'].includes(req.requestType)
-                ) && (
-                  <div className="create-record-section" style={{ marginTop: 'var(--spacing-2xl)' }}>
-                    <h4 className="create-record-title">
-                      <span>✏️</span> Create Record for Approved Patient
-                    </h4>
-                    <p className="create-record-subtitle">
-                      Select an approved patient to create a medical record
-                    </p>
-
-                    <div className="form-group">
-                      <select
-                        value={selectedPatientId || ''}
-                        onChange={(e) => {
-                          setSelectedPatientId(e.target.value);
-                        }}
-                        className="patient-selector"
-                      >
-                        <option value="">-- Select Patient --</option>
-                        {myRequests
-                          .filter(req =>
-                            req.status === 'approved' &&
-                            new Date(req.expiresAt) > new Date() &&
-                            ['create', 'both'].includes(req.requestType)
-                          )
-                          .map(req => (
-                            <option key={req.id} value={req.patientId}>
-                              @{req.PatientProfile?.User?.username || req.PatientProfile?.User?.email} - Expires: {new Date(req.expiresAt).toLocaleDateString()}
-                            </option>
-                          ))
-                        }
-                      </select>
                     </div>
-
-                    {selectedPatientId && (
-                      <button
-                        onClick={() => setShowCreateForm(true)}
-                        className="btn-submit"
-                        style={{ marginTop: 'var(--spacing-md)', width: '100%' }}
-                      >
-                        <span>✏️</span>
-                        <span>Create New Record</span>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </>
+                  );
+                })}
+              </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* ✅ Create Record Modal */}
+      {/* Create Record Modal */}
       {showCreateForm && selectedPatientId && (
-        <div className="modal-overlay" onClick={() => setShowCreateForm(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>✏️ Create New Medical Record</h3>
-              <button 
-                className="modal-close"
-                onClick={() => setShowCreateForm(false)}
-              >
-                ✕
+        <div className="dps-modal-overlay" onClick={() => setShowCreateForm(false)}>
+          <div className="dps-modal" onClick={e => e.stopPropagation()}>
+            <div className="dps-modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <Edit2 size={18} />
+                <h3>Create Medical Record</h3>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowCreateForm(false)}>
+                <X size={16} />
               </button>
             </div>
-            <MedicalRecordForm
-              patientId={selectedPatientId}
-              onSuccess={() => {
-                setShowCreateForm(false);
-                setSelectedPatientId(null);
-                setMessage('✅ Medical record created successfully!');
-                window.location.reload();
-              }}
-            />
+            <div className="dps-modal-body">
+              <MedicalRecordForm
+                patientId={selectedPatientId}
+                onSuccess={() => {
+                  setShowCreateForm(false);
+                  setSelectedPatientId(null);
+                  setSuccess('Medical record created successfully.');
+                }}
+                onCancel={() => setShowCreateForm(false)}
+              />
+            </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }

@@ -1,448 +1,222 @@
 /* frontend/src/components/DoctorPatientSearch.css */
 
-.doctor-search-container {
-  background: var(--white);
-  border-radius: var(--border-radius-lg);
-  padding: var(--spacing-2xl);
-  box-shadow: var(--shadow);
-  animation: fadeIn 0.4s ease;
+.dps-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
 
-.search-header {
-  margin-bottom: var(--spacing-xl);
-  padding-bottom: var(--spacing-lg);
-  border-bottom: 2px solid var(--primary-color);
+/* Card */
+.dps-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--color-card-shadow);
+  overflow: hidden;
 }
 
-.search-header h3 {
-  font-size: var(--font-size-2xl);
-  color: var(--text-primary);
-  font-weight: var(--font-weight-bold);
+.dps-card-header {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-sm);
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
 }
 
-.search-subtitle {
-  color: var(--text-secondary);
-  font-size: var(--font-size-base);
-}
-
-/* Search Form */
-.search-form {
+/* Form */
+.dps-form {
+  padding: var(--space-6);
   display: flex;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-xl);
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
-.search-input-wrapper {
-  flex: 1;
-  min-width: 250px;
+.dps-input-wrapper {
   position: relative;
 }
 
-.search-icon {
+.dps-input-icon {
   position: absolute;
-  left: 16px;
+  left: var(--space-3);
   top: 50%;
   transform: translateY(-50%);
-  color: var(--gray-500);
-  font-size: var(--font-size-xl);
+  color: var(--color-text-muted);
+  pointer-events: none;
 }
 
-.search-input {
-  width: 100%;
-  padding: 14px 16px 14px 48px;
-  border: 2px solid var(--gray-300);
-  border-radius: 50px;
-  font-size: var(--font-size-base);
-  transition: all var(--transition-base);
+.dps-input {
+  padding-left: var(--space-10);
 }
 
-.search-input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-}
-
-.search-button {
-  padding: 14px 32px;
-  background: var(--primary-gradient);
-  color: var(--white);
-  border: none;
-  border-radius: 50px;
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  transition: all var(--transition-base);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  box-shadow: var(--shadow);
-}
-
-.search-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
-}
-
-.search-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Results */
-.search-results {
-  margin-top: var(--spacing-xl);
-}
-
-.results-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-lg);
-}
-
-.results-count {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-}
-
-.patient-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
-}
-
-.patient-card {
-  background: var(--gray-50);
-  border: 2px solid var(--gray-300);
-  border-radius: var(--border-radius-lg);
-  padding: var(--spacing-xl);
-  transition: all var(--transition-base);
-  position: relative;
-}
-
-.patient-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
-  border-color: var(--primary-color);
-}
-
-.patient-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 4px;
-  height: 100%;
-  background: var(--primary-gradient);
-  border-radius: var(--border-radius-lg) 0 0 var(--border-radius-lg);
-}
-
-.patient-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  margin-bottom: var(--spacing-md);
-  gap: var(--spacing-md);
-}
-
-.patient-info {
-  flex: 1;
-}
-
-.patient-email {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-  color: var(--text-primary);
-  margin-bottom: var(--spacing-xs);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-}
-
-.patient-id {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-  font-family: var(--font-family-mono);
-}
-
-.patient-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
-}
-
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-}
-
-.meta-icon {
-  font-size: var(--font-size-base);
-}
-
-/* Request Form */
-.request-form {
-  background: var(--white);
-  border: 2px solid var(--gray-300);
-  border-radius: var(--border-radius);
-  padding: var(--spacing-lg);
-  margin-top: var(--spacing-md);
-}
-
-.form-row {
+.dps-form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
+  gap: var(--space-4);
 }
 
-.form-group {
+/* Requests */
+.dps-requests-header {
+  justify-content: space-between;
+}
+
+.dps-requests-body {
+  padding: var(--space-4) var(--space-6);
+}
+
+.dps-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  padding: var(--space-4) 0;
+}
+
+.dps-requests-list {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--space-3);
 }
 
-.form-group.full-width {
-  grid-column: 1 / -1;
-}
-
-.form-group label {
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
-}
-
-.form-group select,
-.form-group textarea {
-  padding: 10px 14px;
-  border: 2px solid var(--gray-300);
-  border-radius: var(--border-radius);
-  font-size: var(--font-size-base);
-  font-family: var(--font-family);
-  transition: all var(--transition-base);
-}
-
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.form-group textarea {
-  min-height: 80px;
-  resize: vertical;
-}
-
-.form-actions {
+.dps-request-item {
   display: flex;
-  gap: var(--spacing-sm);
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-border);
+  flex-wrap: wrap;
 }
 
-.btn-submit {
+.dps-request-item.status-approved { border-left-color: var(--color-success); }
+.dps-request-item.status-pending  { border-left-color: var(--color-warning); }
+.dps-request-item.status-denied   { border-left-color: var(--color-danger);  }
+.dps-request-item.status-expired  { border-left-color: var(--color-text-muted); opacity: 0.7; }
+
+.dps-request-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   flex: 1;
-  padding: 12px 24px;
-  background: var(--primary-gradient);
-  color: var(--white);
-  border: none;
-  border-radius: var(--border-radius);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  transition: all var(--transition-base);
+  min-width: 200px;
+}
+
+.dps-request-patient {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+}
+
+.dps-request-username {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-weight: var(--font-normal);
+}
+
+.dps-request-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.dps-meta-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.dps-request-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.dps-expires-text {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* Modal */
+.dps-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-xs);
+  z-index: 300;
+  padding: var(--space-4);
 }
 
-.btn-submit:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+.dps-modal {
+  background: var(--color-white);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
-.btn-submit:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.dps-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  color: var(--color-text);
+  position: sticky;
+  top: 0;
+  background: var(--color-white);
+  z-index: 1;
 }
 
-.btn-cancel {
-  padding: 12px 24px;
-  background: var(--white);
-  color: var(--text-secondary);
-  border: 2px solid var(--gray-300);
-  border-radius: var(--border-radius);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  transition: all var(--transition-base);
-}
-
-.btn-cancel:hover {
-  background: var(--gray-100);
-}
-
-/* Empty/Loading States */
-.empty-state,
-.loading-state {
-  text-align: center;
-  padding: var(--spacing-3xl);
-  color: var(--text-secondary);
-}
-
-.empty-icon,
-.loading-icon {
-  font-size: 60px;
-  margin-bottom: var(--spacing-lg);
-  opacity: 0.5;
-}
-
-.loading-state .spinner {
-  width: 50px;
-  height: 50px;
-  margin: 0 auto var(--spacing-lg);
-}
-
-/* Messages */
-.message {
-  padding: var(--spacing-md);
-  border-radius: var(--border-radius);
-  margin-bottom: var(--spacing-lg);
-  font-weight: var(--font-weight-medium);
-}
-
-.message.success {
-  background: var(--success-bg);
-  color: var(--success-text);
-  border: 2px solid var(--success-border);
-}
-
-.message.error {
-  background: var(--danger-bg);
-  color: var(--danger-text);
-  border: 2px solid var(--danger-border);
+.dps-modal-body {
+  padding: var(--space-6);
 }
 
 /* Responsive */
-@media (max-width: 768px) {
-  .doctor-search-container {
-    padding: var(--spacing-xl);
-  }
-
-  .search-form {
-    flex-direction: column;
-  }
-
-  .search-input-wrapper {
-    width: 100%;
-  }
-
-  .search-button {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .form-row {
+@media (max-width: 640px) {
+  .dps-form-row {
     grid-template-columns: 1fr;
   }
 
-  .patient-header {
+  .dps-card-header {
+    padding: var(--space-4);
+  }
+
+  .dps-form {
+    padding: var(--space-4);
+  }
+
+  .dps-requests-body {
+    padding: var(--space-4);
+  }
+
+  .dps-request-item {
     flex-direction: column;
   }
 
-  .form-actions {
-    flex-direction: column;
-  }
-
-  .btn-submit,
-  .btn-cancel {
+  .dps-request-actions {
     width: 100%;
   }
-}
-
-@media (max-width: 480px) {
-  .doctor-search-container {
-    padding: var(--spacing-lg);
-  }
-
-  .search-header h3 {
-    font-size: var(--font-size-xl);
-  }
-
-  .patient-card {
-    padding: var(--spacing-lg);
-  }
-
-
-  
-}
-/* Create Record Section */
-.create-record-section {
-  margin-top: var(--spacing-2xl);
-  background: var(--info-bg);
-  border: 2px solid var(--info-border);
-  border-radius: var(--border-radius-lg);
-  padding: var(--spacing-xl);
-}
-
-.create-record-title {
-  color: var(--info-text);
-  margin-bottom: var(--spacing-sm);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
-.create-record-subtitle {
-  font-size: var(--font-size-sm);
-  color: var(--info-text);
-  margin-bottom: var(--spacing-lg);
-}
-
-.patient-selector {
-  width: 100%;
-  padding: 12px 16px;
-  margin-bottom: var(--spacing-md);
-  border-radius: var(--border-radius);
-  border: 2px solid var(--gray-300);
-  background: var(--white);
-  font-size: var(--font-size-base);
-}
-
-.create-form-container {
-  margin-top: var(--spacing-lg);
-  background: var(--white);
-  border-radius: var(--border-radius-lg);
-  padding: var(--spacing-xl);
-  box-shadow: var(--shadow);
-}
-
-/* Create Form - Make it full width and usable */
-.create-form-container {
-  margin-top: var(--spacing-lg);
-  background: var(--white);
-  border-radius: var(--border-radius-lg);
-  padding: var(--spacing-2xl);
-  box-shadow: var(--shadow);
-  max-height: none !important;  /* Remove height restriction */
-  overflow: visible !important;  /* Remove scroll */
-}
-
-/* Make sure parent doesn't restrict height */
-.create-record-section {
-  margin-top: var(--spacing-2xl);
-  background: var(--info-bg);
-  border: 2px solid var(--info-border);
-  border-radius: var(--border-radius-lg);
-  padding: var(--spacing-xl);
-  max-height: none !important;
-  overflow: visible !important;
 }
