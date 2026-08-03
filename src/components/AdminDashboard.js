@@ -289,59 +289,60 @@ function AdminDashboard() {
                   </div>
 
                   <div className="admin-user-controls">
-                    {/* Role selector */}
-                    <div className="admin-role-select-wrapper">
-                      <select
-                        className="admin-role-select"
-                        value={user.role}
-                        onChange={e => updateRole(user.id, e.target.value)}
-                        disabled={user.updating || user.email === loggedInUserEmail}
-                      >
-                        {ROLES.map(r => (
-                          <option key={r} value={r}>
-                            {r.charAt(0).toUpperCase() + r.slice(1)}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown size={12} className="admin-role-chevron" />
+                    {/* Left group — role + status + date */}
+                    <div className="admin-user-controls-row">
+                      <div className="admin-role-select-wrapper">
+                        <select
+                          className="admin-role-select"
+                          value={user.role}
+                          onChange={e => updateRole(user.id, e.target.value)}
+                          disabled={user.updating || user.email === loggedInUserEmail}
+                        >
+                          {ROLES.map(r => (
+                            <option key={r} value={r}>
+                              {r.charAt(0).toUpperCase() + r.slice(1)}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown size={12} className="admin-role-chevron" />
+                      </div>
+
+                      {user.isEmailVerified && (
+                        <span className="badge badge-success">
+                          <CheckCircle size={10} /> Verified
+                        </span>
+                      )}
+
+                      <span className="admin-user-date">
+                        {new Date(user.createdAt).toLocaleDateString('en-IN')}
+                      </span>
                     </div>
 
-                    {/* Verified badge */}
-                    {user.isEmailVerified && (
-                      <span className="badge badge-success">
-                        <CheckCircle size={10} /> Verified
-                      </span>
-                    )}
-
-                    {/* Join date */}
-                    <span className="admin-user-date">
-                      {new Date(user.createdAt).toLocaleDateString('en-IN')}
-                    </span>
-
-                    {/* Unverify doctor button */}
-                    {user.role === 'doctor' && user.DoctorProfile?.isVerified && (
+                    {/* Right group — action buttons */}
+                    <div className="admin-user-controls-row" style={{ borderLeft: '1px solid var(--color-border)', paddingLeft: 'var(--space-3)' }}>
+                      {user.role === 'doctor' && user.DoctorProfile?.isVerified && (
+                        <button
+                          className="btn btn-sm"
+                          style={{ background: 'var(--color-warning-light)', color: 'var(--color-warning)', border: '1px solid var(--color-warning)' }}
+                          onClick={() => unverifyDoctor(user.id, user.DoctorProfile.id)}
+                          title="Revoke doctor verification"
+                        >
+                          <XCircle size={13} /> Revoke
+                        </button>
+                      )}
                       <button
-                        className="btn btn-sm"
-                        style={{ background: 'var(--color-warning-light)', color: 'var(--color-warning)', border: '1px solid var(--color-warning)' }}
-                        onClick={() => unverifyDoctor(user.id, user.DoctorProfile.id)}
+                        className="btn btn-danger btn-sm"
+                        onClick={() => deleteUser(user.id)}
+                        disabled={user.email === loggedInUserEmail}
+                        title={user.email === loggedInUserEmail ? 'Cannot delete your own account' : 'Delete user'}
+                        style={{
+                          opacity: user.email === loggedInUserEmail ? 0.4 : 1,
+                          cursor: user.email === loggedInUserEmail ? 'not-allowed' : 'pointer'
+                        }}
                       >
-                        <XCircle size={13} /> Revoke
+                        <Trash2 size={13} /> Delete
                       </button>
-                    )}
-
-                    {/* Delete button */}
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => deleteUser(user.id)}
-                      disabled={user.email === loggedInUserEmail}
-                      title={user.email === loggedInUserEmail ? 'Cannot delete your own account' : 'Delete user'}
-                      style={{
-                        opacity: user.email === loggedInUserEmail ? 0.4 : 1,
-                        cursor: user.email === loggedInUserEmail ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    </div>
                   </div>
                 </div>
               ))
