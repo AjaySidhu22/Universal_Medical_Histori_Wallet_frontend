@@ -2,6 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import {
+  Heart, Shield, Clock, Eye, FileText, Stethoscope,
+  Pill, StickyNote, AlignLeft, Calendar, Droplets,
+  AlertTriangle, Phone, User, Lock, AlertCircle,
+  CheckCircle, Building
+} from 'lucide-react';
 import umhwApi from '../api/umhwApi';
 import './EmergencyViewer.css';
 
@@ -12,225 +18,250 @@ function EmergencyViewer() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchEmergencyData();
+    const fetchData = async () => {
+      try {
+        const res = await umhwApi.get(`/qr/public/${token}`);
+        setData(res.data);
+      } catch (err) {
+        setError(
+          err.response?.status === 404
+            ? 'This QR code has expired or is invalid.'
+            : err.response?.status === 410
+            ? 'This QR code has been revoked.'
+            : 'Failed to load emergency medical records.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, [token]);
-
-  const fetchEmergencyData = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const res = await umhwApi.get(`/qr/public/${token}`);
-      setData(res.data.data);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Invalid or expired QR code');
-      console.error('Emergency access error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getFileIcon = (fileType) => {
-    if (!fileType) return '📄';
-    if (fileType.startsWith('image/')) return '🖼️';
-    if (fileType === 'application/pdf') return '📑';
-    return '📄';
-  };
-
-  const formatFileSize = (bytes) => {
-    if (!bytes) return '';
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
-  };
 
   if (loading) {
     return (
-      <div className="emergency-viewer-container">
-        <div className="emergency-loading">
-          <div className="spinner"></div>
-          <p>🚨 Loading Emergency Records...</p>
-        </div>
+      <div className="ev-page ev-loading">
+        <div className="spinner spinner-lg" />
+        <p>Loading emergency records...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="emergency-viewer-container">
-        <div className="emergency-viewer-card">
-          <div className="emergency-error">
-            <div className="emergency-error-icon">⚠️</div>
-            <h3>Access Denied</h3>
-            <p>{error}</p>
-            <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-muted)' }}>
-              This QR code may have expired or been revoked. Please contact the patient for a new code.
-            </p>
+      <div className="ev-page ev-error">
+        <div className="ev-error-card">
+          <div className="ev-error-icon">
+            <AlertCircle size={40} />
+          </div>
+          <h2>Access Unavailable</h2>
+          <p>{error}</p>
+          <div className="ev-error-note">
+            <Lock size={14} />
+            This link may have expired or been revoked by the patient.
           </div>
         </div>
       </div>
     );
   }
 
+  if (!data) return null;
+
+  const { patient, records, accessInfo } = data;
+  const expiresAt = accessInfo?.expiresAt || data.expiresAt;
+  const viewCount = accessInfo?.viewCount || data.viewCount || 0;
+  const accessLevel = accessInfo?.accessLevel || data.accessLevel;
+
   return (
-    <div className="emergency-viewer-container">
-      <div className="emergency-viewer-card">
-        {/* Header */}
-        <div className="emergency-viewer-header">
-          <div className="emergency-icon-large">🚨</div>
-          <h2>Emergency Medical Records</h2>
-          <p className="emergency-subtitle">Read-Only Access • No Login Required</p>
-        </div>
-
-        {/* Access Info Banner */}
-        <div className="emergency-alert">
-          <strong>Access Info:</strong>
-          <span>Level: {data.accessInfo.scope}</span>
-          <span>•</span>
-          <span>Expires: {new Date(data.accessInfo.expiresAt).toLocaleString()}</span>
-          <span>•</span>
-          <span>Views: {data.accessInfo.usageCount}{data.accessInfo.maxUses ? ` / ${data.accessInfo.maxUses}` : ''}</span>
-        </div>
-
-        <div className="emergency-viewer-content">
-          {/* Patient Info */}
-          <div className="patient-emergency-info">
-            <h2 className="section-title">
-              <span>👤</span>
-              Patient Information
-            </h2>
-
-            <div className="emergency-grid">
-               
-              <div className="emergency-field">
-                <strong>📅 Date of Birth</strong>
-                <p>{data.patient.dob || 'Not provided'}</p>
-              </div>
-
-              <div className="emergency-field">
-                <strong>🩸 Blood Group</strong>
-                <p style={{ color: 'var(--danger-color)', fontSize: 'var(--font-size-2xl)' }}>
-                  {data.patient.bloodGroup || 'Not provided'}
-                </p>
-              </div>
-
-              <div className="emergency-field">
-                <strong>⚠️ Allergies</strong>
-                <p style={{ color: 'var(--warning-text)', fontWeight: 'var(--font-weight-bold)' }}>
-                  {data.patient.allergies || 'None reported'}
-                </p>
-              </div>
-
-              <div className="emergency-field">
-                <strong>👤 Emergency Contact</strong>
-                <p>{data.patient.emergencyContactName || 'Not provided'}</p>
-              </div>
-
-              <div className="emergency-field">
-                <strong>📞 Emergency Phone</strong>
-                <p>{data.patient.emergencyContactNumber || 'Not provided'}</p>
-              </div>
-            </div>
+    <div className="ev-page">
+      {/* Top bar */}
+      <div className="ev-topbar">
+        <div className="ev-topbar-brand">
+          <div className="ev-topbar-logo">
+            <Heart size={16} strokeWidth={2.5} />
           </div>
+          <span>MediWallet</span>
+        </div>
+        <div className="ev-topbar-badges">
+          <span className="badge badge-danger">
+            <AlertTriangle size={10} /> Emergency Access
+          </span>
+          <span className="badge badge-muted">
+            <Lock size={10} /> Read-Only
+          </span>
+        </div>
+      </div>
 
-          {/* Medical Records */}
-          <div className="emergency-records">
-            <h2 className="section-title">
-              <span>📋</span>
-              Medical Records ({data.records.length})
-            </h2>
+      <div className="ev-container">
 
-            {data.records.length === 0 ? (
-              <div className="emergency-empty">
-                <div className="emergency-empty-icon">📋</div>
-                <p>No medical records available</p>
+        {/* Access info banner */}
+        <div className="ev-access-banner">
+          <div className="ev-access-item">
+            <Shield size={14} />
+            <span>Level: <strong>{accessLevel}</strong></span>
+          </div>
+          <div className="ev-access-item">
+            <Clock size={14} />
+            <span>Expires: <strong>{new Date(expiresAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></span>
+          </div>
+          <div className="ev-access-item">
+            <Eye size={14} />
+            <span>Views: <strong>{viewCount}</strong></span>
+          </div>
+        </div>
+
+        {/* Patient info */}
+        <div className="ev-card">
+          <div className="ev-card-header">
+            <User size={18} />
+            <h2>Patient Information</h2>
+          </div>
+          <div className="ev-patient-grid">
+            {patient?.dob && (
+              <div className="ev-field">
+                <span className="ev-field-label">
+                  <Calendar size={12} /> Date of Birth
+                </span>
+                <span className="ev-field-value">{patient.dob}</span>
               </div>
-            ) : (
-              <div className="records-list">
-                {data.records.map(record => (
-                  <div key={record.id} className="emergency-record-card">
-                    <div className="record-header">
-                      <div>
-                        <h3 className="record-title">{record.title}</h3>
-                        <div className="record-date">
-                          📅 {new Date(record.recordDate).toLocaleDateString()}
-                        </div>
-                      </div>
-                    </div>
-
-                    {record.fileKey && (
-                      <div className="record-section" style={{ borderLeftColor: 'var(--info-color)' }}>
-                        <strong>📎 Attached File</strong>
-                        <p>
-                          {getFileIcon(record.fileType)} {record.fileName} ({formatFileSize(record.fileSize)})
-                        </p>
-                        {record.fileUrl && (
-                          
-                        <a href={record.fileUrl}
-                            target="_blank"
-                           rel="noopener noreferrer"
-                            className="btn-view"
-                           style={{ marginTop: 'var(--spacing-sm)', display: 'inline-flex' }}
-                         >
-                            <span>📥</span>
-                   <span>View/Download</span>
-                          </a>
-                        )}
-                      </div>
-                    )}
-
-                    {record.DoctorProfile && (
-                      <div className="record-section" style={{ borderLeftColor: 'var(--primary-color)' }}>
-                        <strong>👨‍⚕️ Doctor</strong>
-                        <p>
-                          {record.DoctorProfile.name || 'Unknown'}
-                          {record.DoctorProfile.specialty && ` (${record.DoctorProfile.specialty})`}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="record-content">
-                      {record.diagnosis && (
-                        <div className="record-section" style={{ borderLeftColor: 'var(--danger-color)' }}>
-                          <strong>🩺 Diagnosis</strong>
-                          <p>{record.diagnosis}</p>
-                        </div>
-                      )}
-
-                      {record.prescription && (
-                        <div className="record-section" style={{ borderLeftColor: 'var(--success-color)' }}>
-                          <strong>💊 Prescription</strong>
-                          <p>{record.prescription}</p>
-                        </div>
-                      )}
-
-                      {record.description && (
-                        <div className="record-section">
-                          <strong>📄 Description</strong>
-                          <p>{record.description}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+            )}
+            {patient?.bloodGroup && (
+              <div className="ev-field ev-field-critical">
+                <span className="ev-field-label">
+                  <Droplets size={12} /> Blood Group
+                </span>
+                <span className="ev-field-value ev-field-value-large">
+                  {patient.bloodGroup}
+                </span>
+              </div>
+            )}
+            {patient?.allergies && (
+              <div className="ev-field ev-field-warning">
+                <span className="ev-field-label">
+                  <AlertTriangle size={12} /> Allergies
+                </span>
+                <span className="ev-field-value">{patient.allergies}</span>
+              </div>
+            )}
+            {patient?.emergencyContactName && (
+              <div className="ev-field">
+                <span className="ev-field-label">
+                  <User size={12} /> Emergency Contact
+                </span>
+                <span className="ev-field-value">{patient.emergencyContactName}</span>
+              </div>
+            )}
+            {patient?.emergencyContactNumber && (
+              <div className="ev-field">
+                <span className="ev-field-label">
+                  <Phone size={12} /> Emergency Phone
+                </span>
+                <span className="ev-field-value ev-phone">
+                  <a href={`tel:${patient.emergencyContactNumber}`}>
+                    {patient.emergencyContactNumber}
+                  </a>
+                </span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Footer */}
-        <div style={{
-          background: 'var(--gray-100)',
-          padding: 'var(--spacing-lg)',
-          borderTop: '1px solid var(--gray-300)',
-          textAlign: 'center',
-          fontSize: 'var(--font-size-sm)',
-          color: 'var(--text-secondary)'
-        }}>
-          <p style={{ margin: 0 }}>
-            🔒 This is a secure, time-limited view of medical records. This page does not store any data.
+        {/* Medical records */}
+        {records && records.length > 0 && (
+          <div className="ev-card">
+            <div className="ev-card-header">
+              <FileText size={18} />
+              <h2>Medical Records ({records.length})</h2>
+            </div>
+            <div className="ev-records-list">
+              {records.map((record, index) => (
+                <div key={record.id || index} className="ev-record">
+                  <div className="ev-record-header">
+                    <div className="ev-record-icon">
+                      <FileText size={15} />
+                    </div>
+                    <div>
+                      <h3 className="ev-record-title">{record.title}</h3>
+                      <div className="ev-record-meta">
+                        <Calendar size={12} />
+                        {new Date(record.recordDate).toLocaleDateString('en-IN', {
+                          day: 'numeric', month: 'short', year: 'numeric'
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {record.fileName && (
+                    <div className="ev-record-attachment">
+                      <FileText size={13} />
+                      <span>{record.fileName}</span>
+                    </div>
+                  )}
+
+                  {record.DoctorProfile && (
+                    <div className="ev-record-doctor">
+                      <Stethoscope size={13} />
+                      <span>
+                        {record.DoctorProfile.name?.startsWith('Dr.')
+                          ? record.DoctorProfile.name
+                          : `Dr. ${record.DoctorProfile.name}`}
+                        {record.DoctorProfile.specialty && (
+                          <span className="ev-doctor-specialty">
+                            · {record.DoctorProfile.specialty}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="ev-record-fields">
+                    {record.diagnosis && record.diagnosis !== 'NA' && (
+                      <div className="ev-record-field">
+                        <span className="ev-record-field-label">
+                          <Stethoscope size={11} /> Diagnosis
+                        </span>
+                        <span className="ev-record-field-value">{record.diagnosis}</span>
+                      </div>
+                    )}
+                    {record.prescription && record.prescription !== 'NA' && (
+                      <div className="ev-record-field">
+                        <span className="ev-record-field-label">
+                          <Pill size={11} /> Prescription
+                        </span>
+                        <span className="ev-record-field-value">{record.prescription}</span>
+                      </div>
+                    )}
+                    {record.notes && record.notes !== 'NA' && (
+                      <div className="ev-record-field">
+                        <span className="ev-record-field-label">
+                          <StickyNote size={11} /> Notes
+                        </span>
+                        <span className="ev-record-field-value">{record.notes}</span>
+                      </div>
+                    )}
+                    {record.description && record.description !== 'NA' && (
+                      <div className="ev-record-field">
+                        <span className="ev-record-field-label">
+                          <AlignLeft size={11} /> Description
+                        </span>
+                        <span className="ev-record-field-value">{record.description}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Footer notice */}
+        <div className="ev-footer">
+          <Lock size={14} />
+          <p>
+            This is a secure, time-limited view of medical records.
+            This page does not store any data.
           </p>
         </div>
+
       </div>
     </div>
   );
