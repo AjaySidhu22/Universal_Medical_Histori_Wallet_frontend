@@ -1,252 +1,300 @@
 // frontend/src/components/ProfileForm.js
 
 import React, { useState } from 'react';
+import {
+  User, Calendar, Droplets, AlertCircle, Phone,
+  Building, Stethoscope, BadgeCheck, FileText,
+  Save, X, CheckCircle, AlertTriangle
+} from 'lucide-react';
 import umhwApi from '../api/umhwApi';
 import './ProfileForm.css';
 
-const formFields = {
-  patient: [
-    { 
-      name: 'dob', 
-      label: 'Date of Birth', 
-      type: 'date',
-      icon: '📅',
-      helper: 'Your date of birth for medical records'
-    },
-    {
-      name: 'bloodGroup',
-      label: 'Blood Group',
-      type: 'select',
-      icon: '🩸',
-      options: ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'],
-      helper: 'Required for emergency situations'
-    },
-    { 
-      name: 'allergies', 
-      label: 'Allergies', 
-      type: 'textarea',
-      icon: '⚠️',
-      helper: 'List any known allergies (medications, food, etc.)'
-    },
-    { 
-      name: 'emergencyContactName', 
-      label: 'Emergency Contact Name', 
-      type: 'text',
-      icon: '👤',
-      required: true,
-      helper: 'Person to contact in case of emergency'
-    },
-    { 
-      name: 'emergencyContactNumber', 
-      label: 'Emergency Contact Number', 
-      type: 'tel',
-      icon: '📞',
-      required: true,
-      helper: 'Phone number with country code (e.g., +1234567890)'
-    },
-  ],
-  doctor: [
-    { 
-      name: 'name', 
-      label: 'Full Name', 
-      type: 'text', 
-      required: true,
-      icon: '👨‍⚕️',
-      helper: 'Your full professional name'
-    },
-    { 
-      name: 'specialty', 
-      label: 'Medical Specialty', 
-      type: 'text', 
-      required: true,
-      icon: '🏥',
-      helper: 'Your area of medical expertise (e.g., Cardiology, Pediatrics)'
-    },
-    { 
-      name: 'licenseNumber', 
-      label: 'Medical License Number', 
-      type: 'text', 
-      required: true,
-      icon: '🆔',
-      helper: 'Your official medical license number'
-    },
-    { 
-      name: 'hospitalAffiliation', 
-      label: 'Hospital/Clinic Affiliation', 
-      type: 'text',
-      icon: '🏨',
-      helper: 'Primary hospital or clinic where you practice'
-    },
-  ],
-};
-
 function ProfileForm({ user, profile, setProfile, setIsEditing }) {
-  const initial = profile || {};
-  const [form, setForm] = useState(initial);
-  const [msg, setMsg] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const isPatient = user.role === 'patient';
+  const isDoctor = user.role === 'doctor';
+
+  const [form, setForm] = useState({
+    // Patient fields
+    dob: profile?.dob || '',
+    bloodGroup: profile?.bloodGroup || '',
+    allergies: profile?.allergies || '',
+    emergencyContactName: profile?.emergencyContactName || '',
+    emergencyContactNumber: profile?.emergencyContactNumber || '',
+    // Doctor fields
+    name: profile?.name || '',
+    specialty: profile?.specialty || '',
+    licenseNumber: profile?.licenseNumber || '',
+    hospitalAffiliation: profile?.hospitalAffiliation || '',
+  });
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState('success');
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const submit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    setMsg('');
+    setIsSubmitting(true);
+    setMessage('');
 
     try {
       const res = await umhwApi.put('/profile/profile', form);
       setProfile(res.data.profile);
-      setMsg('✅ Profile updated successfully!');
-
-      setTimeout(() => {
-        setIsEditing(false);
-      }, 1500);
+      setMessage('Profile saved successfully.');
+      setMessageType('success');
+      setTimeout(() => setIsEditing(false), 1200);
     } catch (err) {
-      console.error('Profile update error:', err);
-      setMsg('❌ ' + (err.response?.data?.message || 'Error updating profile'));
+      setMessage(err.response?.data?.message || 'Failed to save profile.');
+      setMessageType('error');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const fieldsToRender = formFields[user.role] || [];
-
   return (
-    <div className="profile-form-container">
+    <div className="profile-form-card">
       <div className="profile-form-header">
-        <h3>
-          <span className="form-icon">
-            {user.role === 'patient' ? '🏥' : '👨‍⚕️'}
-          </span>
-          {profile ? 'Update Your Profile' : 'Create Your Profile'}
-        </h3>
+        <div className="profile-form-title">
+          <User size={18} />
+          {profile ? 'Edit Profile' : 'Create Your Profile'}
+        </div>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={() => setIsEditing(false)}
+          disabled={isSubmitting}
+        >
+          <X size={15} /> Cancel
+        </button>
       </div>
 
-      {msg && (
-        <div className={`form-message ${msg.includes('✅') ? 'success' : 'error'}`}>
-          {msg}
+      {message && (
+        <div className={`alert ${messageType === 'success' ? 'alert-success' : 'alert-danger'} profile-form-message`}>
+          {messageType === 'success'
+            ? <CheckCircle size={15} />
+            : <AlertTriangle size={15} />
+          }
+          {message}
         </div>
       )}
 
-      <form onSubmit={submit} className="profile-form">
-        {user.role === 'patient' && (
-          <div className="form-section">
-            <h4>
-              <span>📋</span>
-              Personal Information
-            </h4>
-          </div>
-        )}
+      <form onSubmit={handleSubmit} className="profile-form-body">
 
-        {user.role === 'doctor' && (
-          <div className="form-section">
-            <h4>
-              <span>👨‍⚕️</span>
-              Professional Information
-            </h4>
-          </div>
-        )}
+        {/* Patient fields */}
+        {isPatient && (
+          <>
+            <div className="profile-form-section-label">Personal Information</div>
 
-        {fieldsToRender.map((field) => (
-          <div 
-            key={field.name} 
-            className={`form-field ${field.type === 'textarea' ? 'full-width' : ''}`}
-          >
-            <label>
-              <span>{field.icon}</span>
-              {field.label}
-              {field.required && <span className="required-star">*</span>}
-            </label>
+            <div className="profile-form-row">
+              <div className="form-group">
+                <label className="form-label" htmlFor="dob">
+                  <Calendar size={13} /> Date of Birth
+                </label>
+                <input
+                  id="dob"
+                  name="dob"
+                  className="form-input"
+                  type="date"
+                  value={form.dob}
+                  onChange={handleChange}
+                  disabled={isSubmitting}
+                />
+              </div>
 
-            {field.type === 'select' ? (
-              <select
-                name={field.name}
-                value={form[field.name] || ''}
-                onChange={handleChange}
-                required={field.required}
-                disabled={isLoading}
-              >
-                <option value="">Select {field.label}...</option>
-                {field.options.map(opt => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-            ) : field.type === 'textarea' ? (
+              <div className="form-group">
+                <label className="form-label" htmlFor="bloodGroup">
+                  <Droplets size={13} /> Blood Group *
+                </label>
+                <select
+                  id="bloodGroup"
+                  name="bloodGroup"
+                  className="form-select"
+                  value={form.bloodGroup}
+                  onChange={handleChange}
+                  required
+                  disabled={isSubmitting}
+                >
+                  <option value="">Select Blood Group</option>
+                  {['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'].map(bg => (
+                    <option key={bg} value={bg}>{bg}</option>
+                  ))}
+                </select>
+                <p className="form-helper">Required for emergency situations</p>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="allergies">
+                <AlertCircle size={13} /> Allergies
+              </label>
               <textarea
-                name={field.name}
-                value={form[field.name] || ''}
+                id="allergies"
+                name="allergies"
+                className="form-textarea"
+                rows={2}
+                value={form.allergies}
                 onChange={handleChange}
-                placeholder={`Enter ${field.label.toLowerCase()}...`}
-                disabled={isLoading}
+                placeholder="List any known allergies (medications, food, etc.)"
+                disabled={isSubmitting}
               />
-            ) : (
-              <input
-                type={field.type}
-                name={field.name}
-                value={form[field.name] || ''}
-                onChange={handleChange}
-                required={field.required}
-                placeholder={
-                  field.type === 'tel' 
-                    ? '+1234567890' 
-                    : field.type === 'date'
-                    ? 'YYYY-MM-DD'
-                    : `Enter ${field.label.toLowerCase()}...`
-                }
-                disabled={isLoading}
-                className={field.type === 'date' ? 'date-input' : ''}
-              />
-            )}
+            </div>
 
-            {field.helper && (
-              <div className="helper-text info">
-                💡 {field.helper}
+            <div className="profile-form-section-label">Emergency Contact</div>
+
+            <div className="profile-form-row">
+              <div className="form-group">
+                <label className="form-label" htmlFor="emergencyContactName">
+                  <User size={13} /> Contact Name *
+                </label>
+                <input
+                  id="emergencyContactName"
+                  name="emergencyContactName"
+                  className="form-input"
+                  type="text"
+                  value={form.emergencyContactName}
+                  onChange={handleChange}
+                  placeholder="Person to contact in emergencies"
+                  required
+                  disabled={isSubmitting}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="emergencyContactNumber">
+                  <Phone size={13} /> Contact Number *
+                </label>
+                <input
+                  id="emergencyContactNumber"
+                  name="emergencyContactNumber"
+                  className="form-input"
+                  type="tel"
+                  value={form.emergencyContactNumber}
+                  onChange={handleChange}
+                  placeholder="+91 9876543210"
+                  required
+                  disabled={isSubmitting}
+                  autoComplete="off"
+                />
+                <p className="form-helper">Include country code</p>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Doctor fields */}
+        {isDoctor && (
+          <>
+            <div className="profile-form-section-label">Professional Information</div>
+
+            <div className="profile-form-row">
+              <div className="form-group">
+                <label className="form-label" htmlFor="name">
+                  <User size={13} /> Full Name *
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  className="form-input"
+                  type="text"
+                  value={form.name}
+                  onChange={handleChange}
+                  placeholder="Your full professional name"
+                  required
+                  disabled={isSubmitting}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="specialty">
+                  <Stethoscope size={13} /> Medical Specialty *
+                </label>
+                <input
+                  id="specialty"
+                  name="specialty"
+                  className="form-input"
+                  type="text"
+                  value={form.specialty}
+                  onChange={handleChange}
+                  placeholder="e.g., Cardiology, Pediatrics"
+                  required
+                  disabled={isSubmitting}
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+
+            <div className="profile-form-row">
+              <div className="form-group">
+                <label className="form-label" htmlFor="licenseNumber">
+                  <FileText size={13} /> License Number *
+                </label>
+                <input
+                  id="licenseNumber"
+                  name="licenseNumber"
+                  className="form-input"
+                  type="text"
+                  value={form.licenseNumber}
+                  onChange={handleChange}
+                  placeholder="Your official medical license number"
+                  required
+                  disabled={isSubmitting}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="hospitalAffiliation">
+                  <Building size={13} /> Hospital / Clinic
+                </label>
+                <input
+                  id="hospitalAffiliation"
+                  name="hospitalAffiliation"
+                  className="form-input"
+                  type="text"
+                  value={form.hospitalAffiliation}
+                  onChange={handleChange}
+                  placeholder="Primary hospital or clinic"
+                  disabled={isSubmitting}
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+
+            {profile && !profile.isVerified && (
+              <div className="alert alert-info">
+                <BadgeCheck size={15} />
+                Your profile requires admin verification before you can create medical records.
               </div>
             )}
-          </div>
-        ))}
-
-        {user.role === 'patient' && (
-          <div className="form-section">
-            <h4>
-              <span>🚨</span>
-              Emergency Contact
-            </h4>
-          </div>
+          </>
         )}
 
-        <div className="form-actions">
-          <button
-            type="button"
-            onClick={() => setIsEditing(false)}
-            disabled={isLoading}
-            className="btn-cancel"
-          >
-            <span>✕</span>
-            <span>Cancel</span>
-          </button>
-
+        {/* Submit */}
+        <div className="profile-form-actions">
           <button
             type="submit"
-            disabled={isLoading}
-            className="btn-save"
+            className="btn btn-primary"
+            disabled={isSubmitting}
           >
-            {isLoading ? (
-              <>
-                <span className="spinner spinner-sm"></span>
-                <span>Saving...</span>
-              </>
-            ) : (
-              <>
-                <span>💾</span>
-                <span>Save Profile</span>
-              </>
-            )}
+            {isSubmitting
+              ? <><div className="spinner spinner-sm" /> Saving...</>
+              : <><Save size={15} /> {profile ? 'Save Changes' : 'Create Profile'}</>
+            }
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => setIsEditing(false)}
+            disabled={isSubmitting}
+          >
+            <X size={15} /> Cancel
           </button>
         </div>
+
       </form>
     </div>
   );
